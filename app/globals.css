@@ -58,3 +58,63 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
   cursor: pointer;
 }
+
+/* Dr. Marcus Lifelike Organic Head & Torso Animations */
+@keyframes doctorTorsoBreathe {
+  0%, 100% {
+    transform: translateY(0px) scaleY(1);
+  }
+  50% {
+    transform: translateY(-2px) scaleY(1.008);
+  }
+}
+
+@keyframes doctorHeadListen {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  22% {
+    transform: translateY(-1.5px) rotate(1.8deg);
+  }
+  38% {
+    transform: translateY(-0.5px) rotate(0.6deg);
+  }
+  56% {
+    transform: translateY(-2px) rotate(-1.6deg);
+  }
+  74% {
+    transform: translateY(-0.8px) rotate(-0.4deg);
+  }
+  88% {
+    transform: translateY(-1.2px) rotate(1deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+@keyframes doctorEyebrowFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+.animate-doctor-torso {
+  animation: doctorTorsoBreathe 5s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+.animate-doctor-head {
+  animation: doctorHeadListen 6.8s ease-in-out infinite;
+  transform-origin: 50% 68%;
+  will-change: transform;
+}
+
+.animate-doctor-eyebrow {
+  animation: doctorEyebrowFloat 5s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+

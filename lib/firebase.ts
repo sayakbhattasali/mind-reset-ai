@@ -52,11 +52,18 @@ export interface SessionLogPayload {
 }
 
 // Local storage helpers for instant feedback and backup
-function saveLocalSession(data: SessionLogPayload) {
+function saveLocalSession(data: SessionLogPayload, docId?: string) {
   if (typeof window === "undefined") return;
   try {
-    const existing = JSON.parse(localStorage.getItem("mindreset_sessions") || "[]");
-    existing.push({ ...data, completedAt: new Date().toISOString(), id: `local_${Date.now()}` });
+    const existing: any[] = JSON.parse(localStorage.getItem("mindreset_sessions") || "[]");
+    const id = docId || `local_${Date.now()}`;
+    // Check if item with this ID already exists
+    const idx = existing.findIndex((item) => item.id === id);
+    if (idx >= 0) {
+      existing[idx] = { ...existing[idx], ...data, id };
+    } else {
+      existing.push({ ...data, completedAt: new Date().toISOString(), id, syncedToFirestore: Boolean(docId) });
+    }
     localStorage.setItem("mindreset_sessions", JSON.stringify(existing));
   } catch (e) {
     console.warn("Local storage write error:", e);
@@ -66,8 +73,8 @@ function saveLocalSession(data: SessionLogPayload) {
 function getLocalSessionsCount(): number {
   if (typeof window === "undefined") return 0;
   try {
-    const existing = JSON.parse(localStorage.getItem("mindreset_sessions") || "[]");
-    return existing.length;
+    const existing: any[] = JSON.parse(localStorage.getItem("mindreset_sessions") || "[]");
+    return existing.filter((s) => s.preScore !== undefined && s.postScore !== undefined).length;
   } catch {
     return 0;
   }
@@ -89,7 +96,7 @@ export async function recordUserSignIn(user: User) {
 
 // 1. Initial anonymous session log (fires immediately upon evaluation)
 export async function logCompletedSession(data: SessionLogPayload): Promise<string | null> {
-  saveLocalSession(data);
+  let firestoreId: string | null = null;
 
   try {
     const currentAuthUser = auth.currentUser;
@@ -101,12 +108,14 @@ export async function logCompletedSession(data: SessionLogPayload): Promise<stri
       platform: "web",
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
     });
+    firestoreId = docRef.id;
     console.log("Session logged to Firestore:", docRef.id);
-    return docRef.id;
   } catch (error) {
     console.warn("Firestore session logging skipped or permission locked:", error);
-    return `local_${Date.now()}`;
   }
+
+  saveLocalSession(data, firestoreId || undefined);
+  return firestoreId || `local_${Date.now()}`;
 }
 
 // 2. Attach Google User if they choose "Sign in with Google" to claim their session
@@ -135,7 +144,7 @@ export async function signInAndClaimSession(sessionId: string | null): Promise<U
   }
 }
 
-// 3. Fetch real live counts from Firebase with local fallback
+// 3. Fetch real live counts from Firebase with local sync
 export async function getLiveFirebaseMetrics(): Promise<{ totalSessions: number; totalUsers: number }> {
   let firestoreSessions = 0;
   let firestoreUsers = 0;
@@ -164,6 +173,6 @@ export async function getLiveFirebaseMetrics(): Promise<{ totalSessions: number;
 
   return {
     totalSessions: Math.max(firestoreSessions, localCount),
-    totalUsers: Math.max(firestoreUsers, authUserCount),
+    totalUsers: Math.max(firestoreUsers, authUserCount, 1),
   };
 }

@@ -121,25 +121,27 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         currentText += event.results[i][0].transcript;
       }
 
-      setTranscript(currentText);
-      lastTranscriptRef.current = currentText;
+      const trimmed = currentText.trim();
+      setTranscript(trimmed);
+      lastTranscriptRef.current = trimmed;
 
-      // Reset silence timer on every detected vocal phoneme
+      // Clear previous timer on every detected vocal sound/word
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
 
-      // 350ms silence detection to eliminate dead air after user finishes speaking
+      // Natural 1400ms silence detection: gives user ample time to finish sentences/thoughts
       silenceTimerRef.current = setTimeout(() => {
         const textToSubmit = lastTranscriptRef.current.trim();
-        if (textToSubmit && !isFinalizedRef.current) {
+        if (textToSubmit.length >= 2 && !isFinalizedRef.current) {
           isFinalizedRef.current = true;
           stopRecognitionInternal();
+          setTranscript("");
           if (onUserSpokeRef.current) {
             onUserSpokeRef.current(textToSubmit);
           }
         }
-      }, 350);
+      }, 1400);
     };
 
     recognition.onerror = (e: any) => {
@@ -149,7 +151,22 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      // If recognition stopped unexpectedly before timer finalized speech, submit if valid
+      if (!isFinalizedRef.current && lastTranscriptRef.current.trim().length >= 2) {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+        isFinalizedRef.current = true;
+        const textToSubmit = lastTranscriptRef.current.trim();
+        stopRecognitionInternal();
+        setTranscript("");
+        if (onUserSpokeRef.current) {
+          onUserSpokeRef.current(textToSubmit);
+        }
+      } else {
+        setIsListening(false);
+      }
     };
 
     recognitionRef.current = recognition;
@@ -321,6 +338,23 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     window.speechSynthesis.speak(utterance);
   }, [stopListening]);
 
+  // 8. Immediate Audio & Mic Termination
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    audioQueueRef.current = [];
+    isPlayingQueueRef.current = false;
+    isStreamCompleteRef.current = true;
+    onQueueFinishedRef.current = null;
+    setIsSpeaking(false);
+  }, []);
+
+  const terminateAllAudio = useCallback(() => {
+    stopSpeaking();
+    stopListening();
+  }, [stopSpeaking, stopListening]);
+
   return {
     isSpeaking,
     isListening,
@@ -331,6 +365,8 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     stopListening,
     speak,
     speakStream,
+    stopSpeaking,
+    terminateAllAudio,
   };
 }
 

@@ -58,19 +58,38 @@ export default function AccountPage() {
       }
     }
 
-    // 2. Fetch local storage sessions (guest sessions or local backup)
+    // 2. Fetch local storage sessions (guest sessions or local backup) with strict deduplication
     try {
       if (typeof window !== "undefined") {
         const localList: any[] = JSON.parse(localStorage.getItem("mindreset_sessions") || "[]");
+        
+        // Build set of existing firestore fingerprints to avoid duplicate local entries
+        const existingFingerprints = new Set<string>();
+        recordsMap.forEach((rec) => {
+          const recTime = rec.completedAt?.seconds 
+            ? Math.floor(rec.completedAt.seconds / 60) 
+            : Math.floor(new Date(rec.completedAt || 0).getTime() / 60000);
+          existingFingerprints.add(`${rec.trigger}_${rec.preScore}_${rec.postScore}_${recTime}`);
+        });
+
         localList.forEach((item, index) => {
+          // Only include verified completed sessions
+          if (item.preScore === undefined || item.postScore === undefined) return;
+
           const localId = item.id || `local_${index}`;
-          if (!recordsMap.has(localId)) {
+          const itemTime = Math.floor(new Date(item.completedAt || 0).getTime() / 60000);
+          const fingerprint = `${item.trigger}_${item.preScore}_${item.postScore}_${itemTime}`;
+
+          if (!recordsMap.has(localId) && !existingFingerprints.has(fingerprint)) {
+            existingFingerprints.add(fingerprint);
             recordsMap.set(localId, {
               id: localId,
               trigger: item.trigger || "General Reset",
-              preScore: item.preScore || 7,
-              postScore: item.postScore || 3,
-              reductionPercent: item.reductionPercent || Math.max(0, Math.round(((item.preScore - item.postScore) / (item.preScore || 1)) * 100)),
+              preScore: item.preScore,
+              postScore: item.postScore,
+              reductionPercent: item.reductionPercent !== undefined 
+                ? item.reductionPercent 
+                : Math.max(0, Math.round(((item.preScore - item.postScore) / (item.preScore || 1)) * 100)),
               completedAt: item.completedAt || new Date().toISOString(),
               userEmail: item.userEmail || currentUser?.email,
               userId: item.userId || currentUser?.uid,
@@ -80,8 +99,8 @@ export default function AccountPage() {
             if (currentUser && !item.syncedToFirestore) {
               logCompletedSession({
                 trigger: item.trigger || "General Reset",
-                preScore: item.preScore || 7,
-                postScore: item.postScore || 3,
+                preScore: item.preScore,
+                postScore: item.postScore,
                 reductionPercent: item.reductionPercent || 50,
                 userId: currentUser.uid,
                 userEmail: currentUser.email,
@@ -90,9 +109,6 @@ export default function AccountPage() {
             }
           }
         });
-        if (currentUser) {
-          localStorage.setItem("mindreset_sessions", JSON.stringify(localList));
-        }
       }
     } catch (e) {
       console.warn("LocalStorage error:", e);

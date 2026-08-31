@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     // Direct opening line if history is empty
     if (!messages || messages.length === 0) {
       return NextResponse.json({
-        reply: "I'm right here. Take a breath, let your shoulders drop, and please tell me how you feel.",
+        reply: `I'm right here with you. Let's calm this ${trigger} together. Take a slow, deep breath... and tell me how you feel.`,
         shouldEnd: false,
         provider: "opening_line",
       });

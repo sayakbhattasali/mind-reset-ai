@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import ProtocolCard from "@/components/ProtocolCard";
-import InterventionModal from "@/components/InterventionModal";
 import Footer from "@/components/Footer";
 import { getLiveFirebaseMetrics } from "@/lib/firebase";
 import { Flame, Activity, Smartphone, BrainCircuit, Heart, ShieldCheck, CheckCircle2, Users } from "lucide-react";
@@ -11,8 +10,6 @@ import { Flame, Activity, Smartphone, BrainCircuit, Heart, ShieldCheck, CheckCir
 export default function Home() {
   const [liveMetrics, setLiveMetrics] = useState({ totalSessions: 0, totalUsers: 0 });
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalTrigger, setModalTrigger] = useState("Substance Craving");
 
   useEffect(() => {
     getLiveFirebaseMetrics().then((data) => {
@@ -21,16 +18,11 @@ export default function Home() {
     });
   }, []);
 
-  const handleOpenModal = (triggerName: string = "Substance Craving") => {
-    setModalTrigger(triggerName);
-    setModalOpen(true);
-  };
-
   return (
     <div className="min-h-screen bg-[#0E0E11] text-zinc-100 font-sans selection:bg-amber-500/25">
-      <Navbar onOpenSession={() => handleOpenModal("Substance Craving")} />
+      <Navbar />
 
-      <HeroSection onStartReset={() => handleOpenModal("Substance Craving")} />
+      <HeroSection />
 
       {/* Live Firestore Telemetry & Scientific Principles Banner */}
       <section id="metrics" className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -182,13 +174,6 @@ export default function Home() {
       </section>
 
       <Footer />
-
-      {/* Interactive In-Page Intervention Modal */}
-      <InterventionModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        initialTrigger={modalTrigger}
-      />
     </div>
   );
 }

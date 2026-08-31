@@ -63,21 +63,12 @@ export default function Navbar({ onOpenSession }: NavbarProps) {
 
         {/* 3. Right: Primary Action & Mobile Toggle */}
         <div className="flex items-center gap-3 shrink-0">
-          {onOpenSession ? (
-            <button
-              onClick={onOpenSession}
-              className="hidden md:inline-flex bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs font-medium px-4 py-2 rounded-full transition-all active:scale-[0.98] whitespace-nowrap"
-            >
-              Start Reset
-            </button>
-          ) : (
-            <Link
-              href="/session?trigger=Substance+Craving"
-              className="hidden md:inline-flex bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs font-medium px-4 py-2 rounded-full transition-all active:scale-[0.98] whitespace-nowrap"
-            >
-              Start Reset
-            </Link>
-          )}
+          <Link
+            href="/session?trigger=Substance+Craving"
+            className="hidden md:inline-flex bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs font-medium px-4 py-2 rounded-full transition-all active:scale-[0.98] whitespace-nowrap"
+          >
+            Start Reset
+          </Link>
 
           {/* Mobile Menu Toggle */}
           <button
