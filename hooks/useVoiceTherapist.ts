@@ -22,11 +22,43 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const isPlayingQueueRef = useRef<boolean>(false);
   const isStreamCompleteRef = useRef<boolean>(false);
   const onQueueFinishedRef = useRef<(() => void) | null>(null);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const prefetchCacheRef = useRef<Map<string, Promise<string | null>>>(new Map());
 
   // Keep callback ref fresh across state changes
   useEffect(() => {
     onUserSpokeRef.current = onUserSpoke;
   }, [onUserSpoke]);
+
+  // Helper to fetch server-side high-fidelity male audio stream (OpenAI onyx / ElevenLabs)
+  const fetchServerAudioUrl = useCallback(async (text: string): Promise<string | null> => {
+    try {
+      const cachedPromise = prefetchCacheRef.current.get(text);
+      if (cachedPromise) {
+        return await cachedPromise;
+      }
+
+      const fetchPromise = (async () => {
+        const res = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+
+        if (!res.ok) return null;
+        const contentType = res.headers.get("Content-Type") || "";
+        if (!contentType.includes("audio")) return null;
+
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+      })();
+
+      prefetchCacheRef.current.set(text, fetchPromise);
+      return await fetchPromise;
+    } catch {
+      return null;
+    }
+  }, []);
 
   // 1. Voice selector: Exhaustive detection & ranking for natural, deep male clinical voices
   const selectTherapistVoice = useCallback(() => {
@@ -246,6 +278,11 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const startListening = useCallback(async () => {
     if (typeof window === "undefined") return;
 
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current.src = "";
+      activeAudioRef.current = null;
+    }
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -339,13 +376,11 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       // Instead of submitting partial garbage, silently restart if we still want to listen.
       if (wantListeningRef.current && !isFinalizedRef.current) {
         try {
-          // Small delay to avoid rapid restart loops
           setTimeout(() => {
             if (wantListeningRef.current && !isFinalizedRef.current && recognitionRef.current) {
               try {
                 recognitionRef.current.start();
               } catch (restartErr) {
-                // If restart fails, give up gracefully
                 setIsListening(false);
                 wantListeningRef.current = false;
               }
@@ -373,9 +408,25 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     stopRecognitionInternal();
   }, [stopRecognitionInternal]);
 
-  // 5. Audio Queue Dispatcher for Streamed Sentences
-  const playNextInQueue = useCallback(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  // Client speech synthesis fallback helper
+  const fallbackClientSpeak = useCallback((sentence: string, onEnd: () => void) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      onEnd();
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(sentence);
+    if (!selectedVoiceRef.current || !isConfirmedMaleRef.current) {
+      selectTherapistVoice();
+    }
+    applyTherapistAcoustics(utterance);
+    utterance.onend = () => onEnd();
+    utterance.onerror = () => onEnd();
+    window.speechSynthesis.speak(utterance);
+  }, [applyTherapistAcoustics, selectTherapistVoice]);
+
+  // 5. Audio Queue Dispatcher for Streamed Sentences (Server-Side TTS + Client Fallback)
+  const playNextInQueue = useCallback(async () => {
+    if (typeof window === "undefined") return;
 
     if (audioQueueRef.current.length === 0) {
       if (isStreamCompleteRef.current) {
@@ -396,32 +447,67 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     isPlayingQueueRef.current = true;
     setIsSpeaking(true);
 
-    const utterance = new SpeechSynthesisUtterance(sentenceToSpeak);
-    if (!selectedVoiceRef.current || !isConfirmedMaleRef.current) {
-      selectTherapistVoice();
+    // Pre-fetch next sentences in parallel for instant zero-latency transitions
+    if (audioQueueRef.current.length > 0) {
+      for (const nextSentence of audioQueueRef.current.slice(0, 2)) {
+        fetchServerAudioUrl(nextSentence);
+      }
     }
-    applyTherapistAcoustics(utterance);
 
-    utterance.onend = () => {
+    // Try server-side audio first (OpenAI onyx / ElevenLabs)
+    const audioUrl = await fetchServerAudioUrl(sentenceToSpeak);
+
+    if (audioUrl) {
+      try {
+        const audio = new Audio(audioUrl);
+        activeAudioRef.current = audio;
+
+        audio.onplay = () => {
+          setIsSpeaking(true);
+        };
+
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          if (activeAudioRef.current === audio) {
+            activeAudioRef.current = null;
+          }
+          playNextInQueue();
+        };
+
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          if (activeAudioRef.current === audio) {
+            activeAudioRef.current = null;
+          }
+          fallbackClientSpeak(sentenceToSpeak, () => playNextInQueue());
+        };
+
+        await audio.play();
+        return;
+      } catch (audioErr) {
+        console.warn("Audio playback error, falling back to speech synthesis:", audioErr);
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+      }
+    }
+
+    // Fallback: Enhanced Client-Side Male Speech Synthesis
+    fallbackClientSpeak(sentenceToSpeak, () => {
       playNextInQueue();
-    };
-
-    utterance.onerror = () => {
-      playNextInQueue();
-    };
-
-    window.speechSynthesis.speak(utterance);
-  }, [applyTherapistAcoustics, selectTherapistVoice]);
+    });
+  }, [fallbackClientSpeak, fetchServerAudioUrl]);
 
   const enqueueSentence = useCallback((sentence: string) => {
     const clean = sentence.replace(/\[END_SESSION\]/g, "").replace(/[*_#`]/g, "").trim();
     if (!clean) return;
 
+    // Immediately start prefetching audio in background
+    fetchServerAudioUrl(clean);
+
     audioQueueRef.current.push(clean);
     if (!isPlayingQueueRef.current) {
       playNextInQueue();
     }
-  }, [playNextInQueue]);
+  }, [fetchServerAudioUrl, playNextInQueue]);
 
   // 6. Stream-to-Sentence Reader & Immediate Playback
   const speakStream = useCallback(async (
@@ -429,9 +515,16 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     onUpdateText: (accumulatedText: string) => void,
     onFinish: (fullText: string, shouldEnd: boolean) => void
   ) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (typeof window === "undefined") return;
 
-    window.speechSynthesis.cancel();
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current.src = "";
+      activeAudioRef.current = null;
+    }
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
     stopListening();
 
     audioQueueRef.current = [];
@@ -492,12 +585,20 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
   }, [enqueueSentence, stopListening]);
 
-  // 7. Static Speak Function
-  const speak = useCallback((text: string, onFinish?: () => void) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  // 7. Static Speak Function (Server-Side TTS + Client Fallback)
+  const speak = useCallback(async (text: string, onFinish?: () => void) => {
+    if (typeof window === "undefined") return;
 
-    window.speechSynthesis.cancel();
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current.src = "";
+      activeAudioRef.current = null;
+    }
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
     stopListening();
+
     audioQueueRef.current = [];
     isPlayingQueueRef.current = false;
     isStreamCompleteRef.current = true;
@@ -508,27 +609,57 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(clean);
-    if (!selectedVoiceRef.current || !isConfirmedMaleRef.current) {
-      selectTherapistVoice();
+    setIsSpeaking(true);
+
+    // Try server-side audio first
+    const audioUrl = await fetchServerAudioUrl(clean);
+    if (audioUrl) {
+      try {
+        const audio = new Audio(audioUrl);
+        activeAudioRef.current = audio;
+
+        audio.onplay = () => setIsSpeaking(true);
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          if (activeAudioRef.current === audio) {
+            activeAudioRef.current = null;
+          }
+          setIsSpeaking(false);
+          if (onFinish) onFinish();
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          if (activeAudioRef.current === audio) {
+            activeAudioRef.current = null;
+          }
+          fallbackClientSpeak(clean, () => {
+            setIsSpeaking(false);
+            if (onFinish) onFinish();
+          });
+        };
+
+        await audio.play();
+        return;
+      } catch (err) {
+        console.warn("Server audio playback failed, using client TTS fallback:", err);
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+      }
     }
-    applyTherapistAcoustics(utterance);
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => {
+    // Client TTS fallback
+    fallbackClientSpeak(clean, () => {
       setIsSpeaking(false);
       if (onFinish) onFinish();
-    };
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      if (onFinish) onFinish();
-    };
-
-    window.speechSynthesis.speak(utterance);
-  }, [applyTherapistAcoustics, selectTherapistVoice, stopListening]);
+    });
+  }, [fallbackClientSpeak, fetchServerAudioUrl, stopListening]);
 
   // 8. Immediate Audio & Mic Termination
   const stopSpeaking = useCallback(() => {
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current.src = "";
+      activeAudioRef.current = null;
+    }
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }

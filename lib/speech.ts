@@ -63,6 +63,7 @@ class SpeechEngine {
   private isMuted: boolean = false;
   private selectedVoice: SpeechSynthesisVoice | null = null;
   private isConfirmedMale: boolean = false;
+  private activeAudio: HTMLAudioElement | null = null;
 
   constructor() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -134,19 +135,84 @@ class SpeechEngine {
   }
 
   public stop() {
+    if (this.activeAudio) {
+      this.activeAudio.pause();
+      this.activeAudio.src = "";
+      this.activeAudio = null;
+    }
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
   }
 
-  public speak(text: string, onStart?: () => void, onEnd?: () => void) {
-    if (this.isMuted || typeof window === "undefined" || !("speechSynthesis" in window)) {
+  public async speak(text: string, onStart?: () => void, onEnd?: () => void) {
+    if (this.isMuted || typeof window === "undefined") {
+      return;
+    }
+
+    this.stop();
+
+    const cleanText = text.replace(/\[END_SESSION\]/g, "").replace(/[*_#`]/g, "").trim();
+    if (!cleanText) {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    // 1. Attempt server-side neural male TTS (OpenAI onyx / ElevenLabs)
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: cleanText }),
+      });
+
+      if (res.ok) {
+        const contentType = res.headers.get("Content-Type") || "";
+        if (contentType.includes("audio")) {
+          const blob = await res.blob();
+          const audioUrl = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrl);
+          this.activeAudio = audio;
+
+          audio.onplay = () => {
+            if (onStart) onStart();
+          };
+
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            if (this.activeAudio === audio) {
+              this.activeAudio = null;
+            }
+            if (onEnd) onEnd();
+          };
+
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            if (this.activeAudio === audio) {
+              this.activeAudio = null;
+            }
+            this.fallbackClientSpeak(cleanText, onStart, onEnd);
+          };
+
+          await audio.play();
+          return;
+        }
+      }
+    } catch {
+      // Ignore network error and fall back to client speech
+    }
+
+    // 2. Client speech synthesis fallback with male acoustic tuning
+    this.fallbackClientSpeak(cleanText, onStart, onEnd);
+  }
+
+  private fallbackClientSpeak(text: string, onStart?: () => void, onEnd?: () => void) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      if (onEnd) onEnd();
       return;
     }
 
     try {
-      this.stop();
-
       const utterance = new SpeechSynthesisUtterance(text);
       const isMobile =
         typeof navigator !== "undefined" &&
@@ -185,7 +251,7 @@ class SpeechEngine {
 
       window.speechSynthesis.speak(utterance);
     } catch {
-      // Fallback silently if speech synthesis encounters error
+      if (onEnd) onEnd();
     }
   }
 }
