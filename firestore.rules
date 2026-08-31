@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow anyone to read aggregate metrics or create a session log
+    match /sessions/{sessionId} {
+      allow read, create: if true;
+      allow update, delete: if request.auth != null;
+    }
+
+    // Allow authenticated users to read and update their user profile
+    match /users/{userId} {
+      allow read, create: if true;
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
