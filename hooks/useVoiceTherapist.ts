@@ -27,54 +27,58 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     onUserSpokeRef.current = onUserSpoke;
   }, [onUserSpoke]);
 
-  // 1. Preload and lock consistent deep, calm male voice across ALL platforms
-  useEffect(() => {
+  // 1. Voice selector for consistent deep, calm male voice across ALL platforms
+  const selectTherapistVoice = useCallback(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
     const MALE_VOICE_KEYWORDS = [
-      "Male", "David", "Guy", "George", "James", "Daniel", "Alex", "Aaron",
-      "Mark", "Fred", "Thomas", "Richard", "Paul", "English Male",
-      // Android-specific male voices
-      "en-us-x-sfg", "en-us-x-tpd", "en-us-x-iol", "en-us-x-iom",
-      "en-gb-x-gba", "en-gb-x-gbb", "en-gb-x-rjs",
+      "male", "david", "guy", "george", "james", "daniel", "alex", "aaron",
+      "mark", "fred", "thomas", "richard", "paul", "uk english male",
+      // Android / Chrome / Samsung TTS explicit male voice IDs
+      "en-us-x-iom", "en-us-x-iol", "en-us-x-tpd",
+      "en-gb-x-rjs", "en-gb-x-gba", "en-au-x-aub", "en-in-x-cfl",
+      "en_us_male", "english (united states, male)", "english united states male",
+      "arthur", "oliver", "rishi", "evan", "nathan", "tom"
     ];
 
     const FEMALE_VOICE_KEYWORDS = [
-      "Female", "Samantha", "Karen", "Victoria", "Fiona", "Moira", "Tessa",
-      "Zira", "Susan", "Hazel", "Linda", "Catherine", "Ava", "Allison",
-      "Siri", "Google UK English Female",
-      "en-us-x-tpc", "en-us-x-sfg#female",
+      "female", "woman", "samantha", "karen", "victoria", "fiona", "moira", "tessa",
+      "zira", "susan", "hazel", "linda", "catherine", "ava", "allison",
+      "siri", "google uk english female", "google us english",
+      "en-us-x-sfg", "en-us-x-tpc", "en-us-x-iob", "en-gb-x-gbb",
+      "zoe", "kate", "nicky", "stephanie"
     ];
 
-    const selectTherapistVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (!voices.length) return;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return;
 
-      const enVoices = voices.filter((v) => v.lang.startsWith("en"));
-      const nameLower = (v: SpeechSynthesisVoice) => v.name.toLowerCase();
+    const enVoices = voices.filter((v) => v.lang.startsWith("en"));
+    const nameLower = (v: SpeechSynthesisVoice) => (v.name + " " + (v.voiceURI || "")).toLowerCase();
 
-      // Priority 1: Explicit male keyword match
-      const explicitMale = enVoices.find((v) =>
-        MALE_VOICE_KEYWORDS.some((kw) => v.name.includes(kw))
-      );
-      if (explicitMale) { selectedVoiceRef.current = explicitMale; return; }
+    // Priority 1: Explicit male voice match
+    const explicitMale = enVoices.find((v) =>
+      MALE_VOICE_KEYWORDS.some((kw) => nameLower(v).includes(kw))
+    );
+    if (explicitMale) { selectedVoiceRef.current = explicitMale; return; }
 
-      // Priority 2: Any en voice that does NOT match a female keyword
-      const notFemale = enVoices.filter((v) =>
-        !FEMALE_VOICE_KEYWORDS.some((kw) => nameLower(v).includes(kw.toLowerCase()))
-      );
-      if (notFemale.length) { selectedVoiceRef.current = notFemale[0]; return; }
+    // Priority 2: Any English voice that does NOT match a female keyword
+    const notFemale = enVoices.filter((v) =>
+      !FEMALE_VOICE_KEYWORDS.some((kw) => nameLower(v).includes(kw))
+    );
+    if (notFemale.length) { selectedVoiceRef.current = notFemale[0]; return; }
 
-      // Priority 3: Any English voice at all
-      if (enVoices.length) { selectedVoiceRef.current = enVoices[0]; return; }
+    // Priority 3: Any English voice
+    if (enVoices.length) { selectedVoiceRef.current = enVoices[0]; return; }
 
-      // Absolute fallback
-      selectedVoiceRef.current = voices[0];
-    };
+    // Absolute fallback
+    selectedVoiceRef.current = voices[0];
+  }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     selectTherapistVoice();
     window.speechSynthesis.onvoiceschanged = selectTherapistVoice;
-  }, []);
+  }, [selectTherapistVoice]);
 
   // 2. Hardware mic permission
   const requestMicAccess = async () => {
@@ -265,11 +269,14 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     setIsSpeaking(true);
 
     const utterance = new SpeechSynthesisUtterance(sentenceToSpeak);
+    if (!selectedVoiceRef.current) {
+      selectTherapistVoice();
+    }
     if (selectedVoiceRef.current) {
       utterance.voice = selectedVoiceRef.current;
     }
-    utterance.pitch = 0.88;
-    utterance.rate = 0.92;
+    utterance.pitch = 0.70;
+    utterance.rate = 0.90;
 
     utterance.onend = () => {
       playNextInQueue();
@@ -378,10 +385,13 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
 
     const utterance = new SpeechSynthesisUtterance(clean);
+    if (!selectedVoiceRef.current) {
+      selectTherapistVoice();
+    }
     if (selectedVoiceRef.current) {
       utterance.voice = selectedVoiceRef.current;
     }
-    utterance.pitch = 0.88;
+    utterance.pitch = 0.70;
     utterance.rate = 0.90;
 
     utterance.onstart = () => setIsSpeaking(true);

@@ -6,11 +6,15 @@
   color-scheme: dark;
 }
 
-html, body {
-  background-color: #05070B !important;
-  color: #ffffff !important;
-  overflow-x: hidden;
-  overscroll-behavior-y: none;
+html {
+  background-color: #05070B;
+  color: #ffffff;
+}
+
+body {
+  background-color: #05070B;
+  color: #ffffff;
+  min-height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 

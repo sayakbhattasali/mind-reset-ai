@@ -194,15 +194,17 @@ function SessionContent() {
       );
     } catch (err) {
       console.error("Chat error:", err);
-      const fallbackText = "I hear you. Take another deep nasal inhale... and release slowly. You are doing great.";
+      const serverDownText = "I apologize, but I am unable to connect to the AI server right now. Wishing you peace and strength.";
       setMessages((prev) => {
         const next = [...prev];
         if (next[assistantIndex]) {
-          next[assistantIndex] = { role: "assistant", content: fallbackText };
+          next[assistantIndex] = { role: "assistant", content: serverDownText };
         }
         return next;
       });
-      speak(fallbackText);
+      speak(serverDownText, () => {
+        endSession();
+      });
     } finally {
       setIsLoading(false);
     }
