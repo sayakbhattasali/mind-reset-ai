@@ -27,21 +27,40 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     onUserSpokeRef.current = onUserSpoke;
   }, [onUserSpoke]);
 
-  // 1. Voice selector for consistent deep, calm male voice across ALL platforms
+  // 1. Voice selector: Ranked preference for natural, high-fidelity male voices
   const selectTherapistVoice = useCallback(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
-    const MALE_VOICE_KEYWORDS = [
-      "male", "david", "guy", "george", "james", "daniel", "alex", "aaron",
-      "mark", "fred", "thomas", "richard", "paul", "uk english male",
-      // Android / Chrome / Samsung TTS explicit male voice IDs
-      "en-us-x-iom", "en-us-x-iol", "en-us-x-tpd",
-      "en-gb-x-rjs", "en-gb-x-gba", "en-au-x-aub", "en-in-x-cfl",
-      "en_us_male", "english (united states, male)", "english united states male",
-      "arthur", "oliver", "rishi", "evan", "nathan", "tom"
+    // Highest quality male voices in priority order across Android, iOS, macOS, Windows
+    const RANKED_MALE_VOICES = [
+      "google uk english male",
+      "daniel",
+      "david",
+      "george",
+      "guy",
+      "arthur",
+      "oliver",
+      "aaron",
+      "alex",
+      "en-gb-x-rjs",
+      "en-gb-x-gba",
+      "en-us-x-iom",
+      "en-us-x-iol",
+      "en-us-x-tpd",
+      "en-au-x-aub",
+      "en_us_male",
+      "english united states male",
+      "english (united states, male)",
+      "james",
+      "mark",
+      "thomas",
+      "richard",
+      "paul",
+      "uk english male",
+      "male"
     ];
 
-    const FEMALE_VOICE_KEYWORDS = [
+    const KNOWN_FEMALE_KEYWORDS = [
       "female", "woman", "samantha", "karen", "victoria", "fiona", "moira", "tessa",
       "zira", "susan", "hazel", "linda", "catherine", "ava", "allison",
       "siri", "google uk english female", "google us english",
@@ -55,22 +74,30 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     const enVoices = voices.filter((v) => v.lang.startsWith("en"));
     const nameLower = (v: SpeechSynthesisVoice) => (v.name + " " + (v.voiceURI || "")).toLowerCase();
 
-    // Priority 1: Explicit male voice match
-    const explicitMale = enVoices.find((v) =>
-      MALE_VOICE_KEYWORDS.some((kw) => nameLower(v).includes(kw))
-    );
-    if (explicitMale) { selectedVoiceRef.current = explicitMale; return; }
+    // 1. Find the highest ranked explicit male voice available on this device
+    for (const keyword of RANKED_MALE_VOICES) {
+      const match = enVoices.find((v) => nameLower(v).includes(keyword));
+      if (match) {
+        selectedVoiceRef.current = match;
+        return;
+      }
+    }
 
-    // Priority 2: Any English voice that does NOT match a female keyword
+    // 2. Fallback: Any English voice that is definitely not in the female blacklist
     const notFemale = enVoices.filter((v) =>
-      !FEMALE_VOICE_KEYWORDS.some((kw) => nameLower(v).includes(kw))
+      !KNOWN_FEMALE_KEYWORDS.some((kw) => nameLower(v).includes(kw))
     );
-    if (notFemale.length) { selectedVoiceRef.current = notFemale[0]; return; }
+    if (notFemale.length) {
+      selectedVoiceRef.current = notFemale[0];
+      return;
+    }
 
-    // Priority 3: Any English voice
-    if (enVoices.length) { selectedVoiceRef.current = enVoices[0]; return; }
+    // 3. Last resort fallback
+    if (enVoices.length) {
+      selectedVoiceRef.current = enVoices[0];
+      return;
+    }
 
-    // Absolute fallback
     selectedVoiceRef.current = voices[0];
   }, []);
 
@@ -275,8 +302,8 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     if (selectedVoiceRef.current) {
       utterance.voice = selectedVoiceRef.current;
     }
-    utterance.pitch = 0.70;
-    utterance.rate = 0.90;
+    utterance.pitch = 1.0;
+    utterance.rate = 0.92;
 
     utterance.onend = () => {
       playNextInQueue();
@@ -391,8 +418,8 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     if (selectedVoiceRef.current) {
       utterance.voice = selectedVoiceRef.current;
     }
-    utterance.pitch = 0.70;
-    utterance.rate = 0.90;
+    utterance.pitch = 1.0;
+    utterance.rate = 0.92;
 
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => {
