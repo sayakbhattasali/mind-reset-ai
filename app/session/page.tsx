@@ -257,7 +257,7 @@ function SessionContent() {
   const urgeReduction = Math.max(0, Math.round(((preScore - postScore) / preScore) * 100));
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] bg-[#0E0E11] text-zinc-100 font-sans flex flex-col overflow-hidden select-none selection:bg-amber-500/30">
+    <div className="fixed inset-0 w-full h-full bg-[#0E0E11] text-zinc-100 font-sans flex flex-col overflow-hidden select-none selection:bg-amber-500/30">
       
       {/* 1. Fixed Top Header */}
       <header className="shrink-0 h-13 sm:h-16 bg-[#0E0E11]/90 backdrop-blur-xl border-b border-zinc-800/80 z-30 px-3.5 sm:px-8 flex items-center justify-between">
@@ -293,8 +293,8 @@ function SessionContent() {
       <main className="flex-1 min-h-0 w-full max-w-6xl mx-auto p-2 sm:p-4 lg:p-6 flex flex-col justify-center overflow-hidden">
         <div className="w-full h-full min-h-0 flex flex-col lg:grid lg:grid-cols-12 gap-2 sm:gap-3.5 lg:gap-6 items-stretch overflow-hidden">
           
-          {/* LEFT COLUMN: Doctor Avatar Studio (Stable Fixed Height on Mobile) */}
-          <section className="h-28 sm:h-36 lg:h-full lg:col-span-5 flex flex-col justify-between bg-gradient-to-b from-[#16161A] via-[#121216] to-[#0E0E11] border border-zinc-800 rounded-2xl sm:rounded-3xl p-2.5 sm:p-4 lg:p-6 shadow-xl relative overflow-hidden shrink-0">
+          {/* LEFT COLUMN: Doctor Avatar Studio */}
+          <section className="flex-[0.4] min-h-[200px] lg:min-h-0 lg:h-full lg:col-span-5 flex flex-col justify-between bg-gradient-to-b from-[#16161A] via-[#121216] to-[#0E0E11] border border-zinc-800 rounded-2xl sm:rounded-3xl p-3 sm:p-4 lg:p-6 shadow-xl relative overflow-hidden shrink-0">
             {/* Ambient Breathing Halo Glow */}
             <motion.div
               className="absolute inset-0 rounded-2xl sm:rounded-3xl pointer-events-none"

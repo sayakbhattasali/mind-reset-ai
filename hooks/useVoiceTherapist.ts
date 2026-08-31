@@ -11,6 +11,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastTranscriptRef = useRef<string>("");
+  const accumulatedFinalsRef = useRef<string>("");
   const isFinalizedRef = useRef<boolean>(false);
   const onUserSpokeRef = useRef(onUserSpoke);
 
@@ -103,6 +104,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
 
     setTranscript("");
     lastTranscriptRef.current = "";
+    accumulatedFinalsRef.current = "";
     isFinalizedRef.current = false;
 
     const recognition = new SpeechRecognition();
@@ -116,20 +118,23 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     };
 
     recognition.onresult = (event: any) => {
-      let finalTranscript = "";
+      let currentFinal = "";
       let interimTranscript = "";
 
-      for (let i = 0; i < event.results.length; i++) {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
-          finalTranscript += result[0].transcript + " ";
+          currentFinal += result[0].transcript + " ";
         } else {
-          // On mobile Chrome/Safari, overwrite the active interim slice instead of concatenating previous iterations
-          interimTranscript = result[0].transcript;
+          interimTranscript += result[0].transcript;
         }
       }
 
-      const combinedText = (finalTranscript + " " + interimTranscript).replace(/\s+/g, " ").trim();
+      if (currentFinal) {
+        accumulatedFinalsRef.current += currentFinal;
+      }
+
+      const combinedText = (accumulatedFinalsRef.current + " " + interimTranscript).replace(/\s+/g, " ").trim();
       if (!combinedText) return;
 
       setTranscript(combinedText);
