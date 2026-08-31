@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -12,6 +12,22 @@ interface NavbarProps {
 export default function Navbar({ onOpenSession }: NavbarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close mobile drawer if user triggers back gesture/button
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    window.history.pushState({ menu: true }, "", window.location.href);
+
+    const handleBack = () => {
+      setMobileOpen(false);
+    };
+
+    window.addEventListener("popstate", handleBack, { once: true });
+    return () => {
+      window.removeEventListener("popstate", handleBack);
+    };
+  }, [mobileOpen]);
 
   const navLinks = [
     { href: "/", label: "Home" },

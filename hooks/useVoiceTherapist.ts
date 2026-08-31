@@ -116,21 +116,31 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     };
 
     recognition.onresult = (event: any) => {
-      let currentText = "";
+      let finalTranscript = "";
+      let interimTranscript = "";
+
       for (let i = 0; i < event.results.length; i++) {
-        currentText += event.results[i][0].transcript;
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript + " ";
+        } else {
+          // On mobile Chrome/Safari, overwrite the active interim slice instead of concatenating previous iterations
+          interimTranscript = result[0].transcript;
+        }
       }
 
-      const trimmed = currentText.trim();
-      setTranscript(trimmed);
-      lastTranscriptRef.current = trimmed;
+      const combinedText = (finalTranscript + " " + interimTranscript).replace(/\s+/g, " ").trim();
+      if (!combinedText) return;
+
+      setTranscript(combinedText);
+      lastTranscriptRef.current = combinedText;
 
       // Clear previous timer on every detected vocal sound/word
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
 
-      // Natural 1400ms silence detection: gives user ample time to finish sentences/thoughts
+      // Natural silence detection (1200ms) to allow comfortable speech pauses
       silenceTimerRef.current = setTimeout(() => {
         const textToSubmit = lastTranscriptRef.current.trim();
         if (textToSubmit.length >= 2 && !isFinalizedRef.current) {
@@ -141,7 +151,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
             onUserSpokeRef.current(textToSubmit);
           }
         }
-      }, 1400);
+      }, 1200);
     };
 
     recognition.onerror = (e: any) => {
