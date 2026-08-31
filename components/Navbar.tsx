@@ -66,14 +66,14 @@ export default function Navbar({ onOpenSession }: NavbarProps) {
           {onOpenSession ? (
             <button
               onClick={onOpenSession}
-              className="bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs font-medium px-4 py-2 rounded-full transition-all active:scale-[0.98] whitespace-nowrap"
+              className="hidden md:inline-flex bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs font-medium px-4 py-2 rounded-full transition-all active:scale-[0.98] whitespace-nowrap"
             >
               Start Reset
             </button>
           ) : (
             <Link
               href="/session?trigger=Substance+Craving"
-              className="bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs font-medium px-4 py-2 rounded-full transition-all active:scale-[0.98] whitespace-nowrap"
+              className="hidden md:inline-flex bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs font-medium px-4 py-2 rounded-full transition-all active:scale-[0.98] whitespace-nowrap"
             >
               Start Reset
             </Link>
@@ -82,7 +82,7 @@ export default function Navbar({ onOpenSession }: NavbarProps) {
           {/* Mobile Menu Toggle */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden p-2 rounded-full bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white transition-colors"
+            className="md:hidden w-9 h-9 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
           >
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
