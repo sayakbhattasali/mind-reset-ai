@@ -214,13 +214,41 @@ function SessionContent() {
     
     setMessages([{ role: "assistant", content: initialGreeting }]);
     
+    // Request mic permission early (but don't start listening yet — doctor speaks first)
     try {
       await requestMicAccess();
-      startListening();
     } catch (e) {
       console.warn("Microphone access declined or unavailable.");
     }
 
+    // On mobile, speech synthesis clips the start of the first utterance.
+    // Warm up the engine with a silent utterance, then speak the real greeting.
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile) {
+        const warmup = new SpeechSynthesisUtterance(" ");
+        warmup.volume = 0;
+        warmup.rate = 10; // finish instantly
+        warmup.onend = () => {
+          // Small extra buffer for the engine to be truly ready
+          setTimeout(() => {
+            speak(initialGreeting, () => {
+              startListening();
+            });
+          }, 300);
+        };
+        warmup.onerror = () => {
+          // Fallback: just speak directly if warmup fails
+          speak(initialGreeting, () => {
+            startListening();
+          });
+        };
+        window.speechSynthesis.speak(warmup);
+        return;
+      }
+    }
+
+    // Desktop: speak immediately (no warmup needed)
     speak(initialGreeting, () => {
       startListening();
     });
@@ -260,25 +288,25 @@ function SessionContent() {
     <div className="fixed inset-0 w-full h-full bg-[#0E0E11] text-zinc-100 font-sans flex flex-col overflow-hidden select-none selection:bg-amber-500/30">
       
       {/* 1. Fixed Top Header */}
-      <header className="shrink-0 h-13 sm:h-16 bg-[#0E0E11]/90 backdrop-blur-xl border-b border-zinc-800/80 z-30 px-3.5 sm:px-8 flex items-center justify-between">
+      <header className="shrink-0 h-14 sm:h-16 bg-[#0E0E11]/90 backdrop-blur-xl border-b border-zinc-800/80 z-30 px-4 sm:px-8 flex items-center justify-between">
         <button
           onClick={handleExitSession}
-          className="flex items-center gap-1.5 sm:gap-2 text-zinc-400 hover:text-white transition-colors text-xs sm:text-sm font-medium focus:outline-none"
+          className="flex items-center gap-1.5 sm:gap-2 text-zinc-400 hover:text-white transition-colors text-sm sm:text-sm font-medium focus:outline-none"
         >
-          <ArrowLeft size={15} />
-          <span>Exit Session</span>
+          <ArrowLeft size={16} />
+          <span>Exit</span>
         </button>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-400">
-            <HeartPulse size={14} />
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-400">
+            <HeartPulse size={16} />
           </div>
-          <span className="font-semibold text-xs sm:text-base text-zinc-100 tracking-tight">
+          <span className="font-semibold text-base sm:text-lg text-zinc-100 tracking-tight">
             Mind<span className="text-amber-400">Reset</span>
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px] text-zinc-400 uppercase tracking-wider">
+        <div className="flex items-center gap-1.5 font-mono text-[11px] sm:text-xs text-zinc-400 uppercase tracking-wider">
           <span className={`w-2 h-2 rounded-full ${phase === "active" ? "bg-amber-400 animate-pulse" : "bg-zinc-600"}`} />
           <span className="hidden sm:inline">
             {phase === "calibrate" && "Calibration"}
@@ -290,11 +318,11 @@ function SessionContent() {
       </header>
 
       {/* 2. Main Viewport Container: 100% Screen-Fit Above The Fold */}
-      <main className="flex-1 min-h-0 w-full max-w-6xl mx-auto p-2 sm:p-4 lg:p-6 flex flex-col justify-center overflow-hidden">
-        <div className="w-full h-full min-h-0 flex flex-col lg:grid lg:grid-cols-12 gap-2 sm:gap-3.5 lg:gap-6 items-stretch overflow-hidden">
+      <main className="flex-1 min-h-0 w-full max-w-6xl mx-auto p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
+        <div className="w-full h-full min-h-0 flex flex-col lg:grid lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 items-stretch overflow-hidden">
           
           {/* LEFT COLUMN: Doctor Avatar Studio */}
-          <section className="flex-[0.4] min-h-[200px] lg:min-h-0 lg:h-full lg:col-span-5 flex flex-col justify-between bg-gradient-to-b from-[#16161A] via-[#121216] to-[#0E0E11] border border-zinc-800 rounded-2xl sm:rounded-3xl p-3 sm:p-4 lg:p-6 shadow-xl relative overflow-hidden shrink-0">
+          <section className="flex-[2] min-h-0 lg:h-full lg:col-span-5 flex flex-col justify-between bg-gradient-to-b from-[#16161A] via-[#121216] to-[#0E0E11] border border-zinc-800 rounded-2xl sm:rounded-3xl p-3 sm:p-4 lg:p-6 shadow-xl relative overflow-hidden">
             {/* Ambient Breathing Halo Glow */}
             <motion.div
               className="absolute inset-0 rounded-2xl sm:rounded-3xl pointer-events-none"
@@ -308,13 +336,13 @@ function SessionContent() {
 
             {/* Status Header Pill */}
             <div className="relative z-10 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-zinc-900/90 border border-zinc-800 backdrop-blur-md">
-                <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSpeaking ? "bg-amber-400 animate-pulse" : "bg-amber-500"}`} />
-                <span className="text-[10px] sm:text-xs font-semibold text-zinc-200">
-                  {isSpeaking ? "Dr. Marcus • Active Guidance" : "Dr. Marcus • Clinical AI"}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900/90 border border-zinc-800 backdrop-blur-md">
+                <span className={`w-2 h-2 rounded-full ${isSpeaking ? "bg-amber-400 animate-pulse" : "bg-amber-500"}`} />
+                <span className="text-xs font-semibold text-zinc-200">
+                  {isSpeaking ? "Dr. Marcus • Speaking" : "Dr. Marcus • AI"}
                 </span>
               </div>
-              <span className="text-[9px] sm:text-[10px] font-mono text-amber-400/80 uppercase tracking-wider">
+              <span className="text-[10px] sm:text-[11px] font-mono text-amber-400/80 uppercase tracking-wider hidden sm:inline">
                 Somatic Edge
               </span>
             </div>
@@ -325,30 +353,30 @@ function SessionContent() {
             </div>
 
             {/* Audio Wave & State Indicator */}
-            <div className="relative z-10 pt-1.5 border-t border-zinc-800/80 flex items-center justify-between text-[10px] sm:text-xs text-zinc-400 shrink-0">
+            <div className="relative z-10 pt-1.5 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400 shrink-0">
               <div className="flex items-center gap-1.5 min-w-0">
                 {isSpeaking ? (
-                  <span className="flex items-center gap-1 text-amber-400 font-medium text-[10px] sm:text-xs truncate">
-                    <Volume2 size={13} className="animate-pulse shrink-0" />
-                    <span className="truncate">Speaking grounding steps...</span>
+                  <span className="flex items-center gap-1.5 text-amber-400 font-medium truncate">
+                    <Volume2 size={14} className="animate-pulse shrink-0" />
+                    <span className="truncate">Speaking...</span>
                   </span>
                 ) : isListening ? (
-                  <span className="flex items-center gap-1 text-rose-400 font-medium text-[10px] sm:text-xs animate-pulse truncate">
-                    <Mic size={13} className="shrink-0" />
-                    <span>Listening to you...</span>
+                  <span className="flex items-center gap-1.5 text-rose-400 font-medium animate-pulse truncate">
+                    <Mic size={14} className="shrink-0" />
+                    <span>Listening...</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] sm:text-xs text-zinc-400 truncate">
+                  <span className="text-xs text-zinc-400 truncate">
                     Target: <strong className="text-zinc-200">{selectedTrigger}</strong>
                   </span>
                 )}
               </div>
-              <span className="font-mono text-[8px] sm:text-[10px] text-zinc-500 shrink-0 ml-1">Live Feedback</span>
+              <span className="font-mono text-[10px] text-zinc-500 shrink-0 ml-1 hidden sm:inline">Live Feedback</span>
             </div>
           </section>
 
           {/* RIGHT COLUMN: Clinical Console */}
-          <section className="flex-1 min-h-0 h-full lg:col-span-7 flex flex-col justify-between bg-[#16161A] border border-zinc-800 rounded-2xl sm:rounded-3xl p-3 sm:p-5 lg:p-6 backdrop-blur-xl shadow-xl overflow-hidden">
+          <section className="flex-[3] min-h-0 lg:col-span-7 flex flex-col bg-[#16161A] border border-zinc-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 lg:p-6 backdrop-blur-xl shadow-xl overflow-hidden">
             <AnimatePresence mode="wait">
               
               {/* STEP 1: Pre-Urge Calibration (100% Fits All Mobile Screens) */}
@@ -358,26 +386,26 @@ function SessionContent() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="flex-1 min-h-0 h-full flex flex-col justify-between space-y-2 sm:space-y-3.5 overflow-hidden"
+                  className="flex-1 min-h-0 h-full flex flex-col justify-between space-y-3 sm:space-y-4 overflow-y-auto"
                 >
-                  <div className="space-y-0.5">
-                    <div className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-mono text-amber-400 uppercase tracking-wider">
-                      <Activity size={12} /> Intake Calibration
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 text-xs sm:text-xs font-mono text-amber-400 uppercase tracking-wider">
+                      <Activity size={14} /> Intake Calibration
                     </div>
-                    <h2 className="text-sm sm:text-xl lg:text-3xl font-extrabold text-zinc-100 tracking-tight leading-tight">
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-zinc-100 tracking-tight leading-tight">
                       What are you experiencing?
                     </h2>
-                    <p className="text-[10px] sm:text-xs text-zinc-400 leading-tight">
-                      Choose your trigger category and baseline intensity level.
+                    <p className="text-xs sm:text-sm text-zinc-400 leading-snug">
+                      Choose your trigger and set your baseline intensity.
                     </p>
                   </div>
 
                   {/* Trigger Selection Grid */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-mono uppercase text-zinc-500">
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-mono uppercase text-zinc-500">
                       Select Trigger:
                     </span>
-                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1 sm:gap-2">
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 sm:gap-2">
                       {AVAILABLE_TRIGGERS.map((t) => {
                         const isSelected = selectedTrigger === t.id;
                         return (
@@ -385,13 +413,13 @@ function SessionContent() {
                             key={t.id}
                             type="button"
                             onClick={() => setSelectedTrigger(t.id)}
-                            className={`flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-semibold transition-all border text-left ${
+                            className={`flex items-center gap-2 px-3 py-2 sm:px-3 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border text-left ${
                               isSelected
                                 ? "bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm"
                                 : "bg-zinc-900/90 border-zinc-800 text-zinc-400 hover:bg-zinc-800/80 hover:text-white"
                             }`}
                           >
-                            <t.icon size={12} className={`shrink-0 ${isSelected ? "text-amber-400" : "text-zinc-500"}`} />
+                            <t.icon size={14} className={`shrink-0 ${isSelected ? "text-amber-400" : "text-zinc-500"}`} />
                             <span className="truncate">{t.label}</span>
                           </button>
                         );
@@ -400,13 +428,13 @@ function SessionContent() {
                   </div>
 
                   {/* Urge Intensity Meter */}
-                  <div className="p-2 sm:p-3.5 rounded-xl sm:rounded-2xl bg-[#1C1D22] border border-zinc-800/80 space-y-1 text-center">
+                  <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#1C1D22] border border-zinc-800/80 space-y-2 text-center">
                     <div>
-                      <div className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-amber-400 font-mono tracking-tight leading-tight">
-                        {preScore} <span className="text-xs sm:text-sm text-zinc-500 font-normal">/ 10</span>
+                      <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-amber-400 font-mono tracking-tight leading-tight">
+                        {preScore} <span className="text-sm sm:text-base text-zinc-500 font-normal">/ 10</span>
                       </div>
-                      <div className="text-[10px] sm:text-[11px] text-zinc-400 font-medium">
-                        Urge Intensity (1 = mild, 10 = acute peak)
+                      <div className="text-xs sm:text-sm text-zinc-400 font-medium">
+                        Urge Intensity (1 = mild, 10 = peak)
                       </div>
                     </div>
 
@@ -416,17 +444,17 @@ function SessionContent() {
                       max="10"
                       value={preScore}
                       onChange={(e) => setPreScore(Number(e.target.value))}
-                      className="w-full h-1.5 sm:h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                      className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
                     />
                   </div>
 
                   {/* Primary CTA: Always Visible On Mobile Without Scrolling */}
                   <button
                     onClick={beginTherapy}
-                    className="w-full py-2.5 sm:py-3.5 bg-[#FF8811] hover:bg-amber-400 text-zinc-950 font-bold rounded-xl sm:rounded-2xl transition-all shadow-[0_4px_25px_rgba(255,136,17,0.25)] text-xs sm:text-base flex items-center justify-center gap-1.5 active:scale-[0.98] shrink-0"
+                    className="w-full py-3 sm:py-3.5 bg-[#FF8811] hover:bg-amber-400 text-zinc-950 font-bold rounded-xl sm:rounded-2xl transition-all shadow-[0_4px_25px_rgba(255,136,17,0.25)] text-sm sm:text-base flex items-center justify-center gap-2 active:scale-[0.98] shrink-0"
                   >
-                    <span>Start Guided Voice Session</span>
-                    <ArrowRight size={15} />
+                    <span>Start Voice Session</span>
+                    <ArrowRight size={16} />
                   </button>
                 </motion.div>
               )}
@@ -441,19 +469,19 @@ function SessionContent() {
                   className="flex-1 min-h-0 h-full flex flex-col justify-between overflow-hidden space-y-2"
                 >
                   {/* Console Top Bar: No Collision / Overlap */}
-                  <div className="shrink-0 flex items-center justify-between gap-2 pb-1.5 border-b border-zinc-800/80">
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
-                      <span className="hidden sm:inline text-xs font-semibold text-zinc-200 shrink-0">Session Stream</span>
-                      <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full truncate">
+                  <div className="shrink-0 flex items-center justify-between gap-2 pb-2 border-b border-zinc-800/80">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                      <span className="hidden sm:inline text-sm font-semibold text-zinc-200 shrink-0">Session</span>
+                      <span className="text-xs font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full truncate">
                         {selectedTrigger} &bull; {preScore}/10
                       </span>
                     </div>
                     <button
                       onClick={endSession}
-                      className="text-[11px] sm:text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap"
+                      className="text-xs sm:text-sm font-semibold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 px-3 py-1.5 rounded-lg shrink-0 whitespace-nowrap"
                     >
                       <span>Wrap Up</span>
-                      <ArrowRight size={12} />
+                      <ArrowRight size={13} />
                     </button>
                   </div>
 
@@ -469,11 +497,11 @@ function SessionContent() {
                           key={idx}
                           className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
                         >
-                          <span className="text-[9px] sm:text-[10px] font-mono text-zinc-500 mb-0.5 px-1">
+                          <span className="text-[10px] sm:text-xs font-mono text-zinc-500 mb-0.5 px-1">
                             {m.role === "user" ? "You" : "Dr. Marcus"}
                           </span>
                           <div
-                            className={`max-w-[88%] rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm leading-relaxed ${
+                            className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm sm:text-base leading-relaxed ${
                               m.role === "user"
                                 ? "bg-amber-500/15 text-amber-100 border border-amber-500/25 rounded-tr-none shadow-sm"
                                 : "bg-zinc-900/90 text-zinc-200 border border-zinc-800 rounded-tl-none font-light shadow-sm"
@@ -486,8 +514,8 @@ function SessionContent() {
                     )}
                     {isListening && transcript && (
                       <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-mono text-amber-400 mb-0.5 animate-pulse px-1">Transcribing...</span>
-                        <div className="max-w-[88%] rounded-2xl px-3.5 py-2 text-xs sm:text-sm leading-relaxed bg-amber-500/10 text-amber-300 border border-amber-500/20 italic">
+                        <span className="text-[10px] font-mono text-amber-400 mb-0.5 animate-pulse px-1">Transcribing...</span>
+                        <div className="max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed bg-amber-500/10 text-amber-300 border border-amber-500/20 italic">
                           &ldquo;{transcript}&rdquo;
                         </div>
                       </div>
@@ -511,11 +539,11 @@ function SessionContent() {
                       </button>
                       <input
                         type="text"
-                        placeholder={isListening ? "Listening to your voice..." : "Speak aloud or type here..."}
+                        placeholder={isListening ? "Listening..." : "Type here..."}
                         value={inputVal}
                         onChange={(e) => setInputVal(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                        className="flex-1 min-w-0 bg-[#1C1D22] border border-zinc-800 rounded-xl sm:rounded-2xl px-3 sm:px-4 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/50"
+                        className="flex-1 min-w-0 bg-[#1C1D22] border border-zinc-800 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/50"
                       />
                       <button
                         onClick={() => handleSendMessage()}
@@ -526,9 +554,9 @@ function SessionContent() {
                       </button>
                     </div>
 
-                    <div className="flex justify-between items-center text-[9px] sm:text-[10px] text-zinc-500 px-1 font-mono">
+                    <div className="flex justify-between items-center text-[10px] sm:text-xs text-zinc-500 px-1 font-mono">
                       <span>Mic: {hasMicPermission ? "Connected" : "Standby"}</span>
-                      <span>Speak naturally or type anytime</span>
+                      <span>Speak or type anytime</span>
                     </div>
                   </div>
                 </motion.div>
@@ -541,22 +569,22 @@ function SessionContent() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="flex-1 min-h-0 h-full flex flex-col justify-between space-y-2 sm:space-y-4 overflow-hidden"
+                  className="flex-1 min-h-0 h-full flex flex-col justify-between space-y-3 sm:space-y-4 overflow-hidden"
                 >
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] sm:text-xs font-mono uppercase text-amber-400 tracking-wider">Clinical Re-Assessment</span>
-                    <h2 className="text-sm sm:text-xl lg:text-3xl font-extrabold text-zinc-100 tracking-tight leading-tight">How strong is the urge now?</h2>
-                    <p className="text-[10px] sm:text-xs text-zinc-400">
-                      Check your physiological state. Slide to record your post-session intensity.
+                  <div className="space-y-1">
+                    <span className="text-xs sm:text-xs font-mono uppercase text-amber-400 tracking-wider">Clinical Re-Assessment</span>
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-zinc-100 tracking-tight leading-tight">How strong is the urge now?</h2>
+                    <p className="text-xs sm:text-sm text-zinc-400">
+                      Slide to record your post-session intensity.
                     </p>
                   </div>
 
-                  <div className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-[#1C1D22] border border-zinc-800/80 space-y-2 text-center my-auto">
-                    <div className="text-3xl sm:text-5xl font-extrabold text-amber-400 font-mono tracking-tight leading-tight">
-                      {postScore} <span className="text-xs sm:text-sm text-zinc-500 font-normal">/ 10</span>
+                  <div className="p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-[#1C1D22] border border-zinc-800/80 space-y-2 text-center my-auto">
+                    <div className="text-4xl sm:text-5xl font-extrabold text-amber-400 font-mono tracking-tight leading-tight">
+                      {postScore} <span className="text-sm sm:text-base text-zinc-500 font-normal">/ 10</span>
                     </div>
-                    <div className="text-[10px] sm:text-xs text-zinc-400">
-                      Rate your updated tension level
+                    <div className="text-xs sm:text-sm text-zinc-400">
+                      Updated tension level
                     </div>
 
                     <input
@@ -565,16 +593,16 @@ function SessionContent() {
                       max="10"
                       value={postScore}
                       onChange={(e) => setPostScore(Number(e.target.value))}
-                      className="w-full h-1.5 sm:h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                      className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
                     />
                   </div>
 
                   <button
                     onClick={handleFinishEvaluation}
-                    className="w-full py-2.5 sm:py-3.5 bg-[#FF8811] hover:bg-amber-400 text-zinc-950 font-bold rounded-xl sm:rounded-2xl transition-all shadow-[0_4px_25px_rgba(255,136,17,0.25)] text-xs sm:text-base flex items-center justify-center gap-1.5 active:scale-[0.98] shrink-0"
+                    className="w-full py-3 sm:py-3.5 bg-[#FF8811] hover:bg-amber-400 text-zinc-950 font-bold rounded-xl sm:rounded-2xl transition-all shadow-[0_4px_25px_rgba(255,136,17,0.25)] text-sm sm:text-base flex items-center justify-center gap-2 active:scale-[0.98] shrink-0"
                   >
-                    <span>Generate Verified Relief Summary</span>
-                    <ArrowRight size={15} />
+                    <span>Generate Relief Summary</span>
+                    <ArrowRight size={16} />
                   </button>
                 </motion.div>
               )}
@@ -588,39 +616,39 @@ function SessionContent() {
                   className="flex-1 min-h-0 h-full flex flex-col justify-between space-y-2.5 sm:space-y-3.5 text-center overflow-y-auto pr-0.5 scrollbar-thin"
                 >
                   <div>
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400 mb-0.5 sm:mb-1">
-                      <ShieldCheck size={20} />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400 mb-1">
+                      <ShieldCheck size={22} />
                     </div>
-                    <h2 className="text-base sm:text-xl font-bold text-zinc-100">Somatic Relief Verified</h2>
-                    <p className="text-[10px] sm:text-xs text-zinc-400 font-mono mt-0.5">{selectedTrigger}</p>
+                    <h2 className="text-lg sm:text-xl font-bold text-zinc-100">Somatic Relief Verified</h2>
+                    <p className="text-xs sm:text-sm text-zinc-400 font-mono mt-0.5">{selectedTrigger}</p>
                   </div>
 
                   {/* Pre/Post Urge Metrics Delta */}
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2 sm:p-3 border border-zinc-800 bg-[#1C1D22] rounded-xl sm:rounded-2xl font-mono">
+                  <div className="grid grid-cols-3 gap-2 p-3 sm:p-4 border border-zinc-800 bg-[#1C1D22] rounded-xl sm:rounded-2xl font-mono">
                     <div>
-                      <div className="text-[9px] sm:text-[10px] text-zinc-500 uppercase">Pre-Urge</div>
-                      <div className="text-lg sm:text-2xl font-bold text-rose-400 mt-0.5">{preScore}/10</div>
+                      <div className="text-[10px] sm:text-xs text-zinc-500 uppercase">Pre-Urge</div>
+                      <div className="text-xl sm:text-2xl font-bold text-rose-400 mt-0.5">{preScore}/10</div>
                     </div>
                     <div>
-                      <div className="text-[9px] sm:text-[10px] text-zinc-500 uppercase">Post-Urge</div>
-                      <div className="text-lg sm:text-2xl font-bold text-amber-400 mt-0.5">{postScore}/10</div>
+                      <div className="text-[10px] sm:text-xs text-zinc-500 uppercase">Post-Urge</div>
+                      <div className="text-xl sm:text-2xl font-bold text-amber-400 mt-0.5">{postScore}/10</div>
                     </div>
                     <div>
-                      <div className="text-[9px] sm:text-[10px] text-zinc-500 uppercase">Relief</div>
-                      <div className="text-lg sm:text-2xl font-bold text-amber-300 mt-0.5">{urgeReduction}%</div>
+                      <div className="text-[10px] sm:text-xs text-zinc-500 uppercase">Relief</div>
+                      <div className="text-xl sm:text-2xl font-bold text-amber-300 mt-0.5">{urgeReduction}%</div>
                     </div>
                   </div>
 
                   {/* Streak Claiming Box */}
                   {!currentUser ? (
-                    <div className="p-2.5 sm:p-4 rounded-xl sm:rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-2 text-left">
+                    <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-2.5 text-left">
                       <div>
-                        <div className="text-xs sm:text-sm font-semibold text-zinc-100 flex items-center gap-1.5">
-                          <Sparkles size={13} className="text-amber-400 shrink-0" />
-                          <span>Save this session to your streak?</span>
+                        <div className="text-sm sm:text-base font-semibold text-zinc-100 flex items-center gap-1.5">
+                          <Sparkles size={14} className="text-amber-400 shrink-0" />
+                          <span>Save this session?</span>
                         </div>
-                        <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 leading-tight">
-                          Sign in with Google to log recovery trends, or continue as guest to stay anonymous.
+                        <p className="text-xs sm:text-sm text-zinc-400 mt-1 leading-snug">
+                          Sign in with Google to log recovery trends, or continue as guest.
                         </p>
                       </div>
 
@@ -628,14 +656,14 @@ function SessionContent() {
                         <button
                           onClick={handleGoogleSignIn}
                           disabled={authLoading}
-                          className="flex-1 py-2 px-3 bg-amber-400 hover:bg-amber-300 text-zinc-950 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          className="flex-1 py-2.5 px-3 bg-amber-400 hover:bg-amber-300 text-zinc-950 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                         >
                           <LogIn size={13} />
                           <span>{authLoading ? "Linking..." : "Sign In with Google"}</span>
                         </button>
                         <button
                           onClick={() => { setMessages([]); changePhase("calibrate"); }}
-                          className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-medium rounded-xl transition-all"
+                          className="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-sm font-medium rounded-xl transition-all"
                         >
                           Close
                         </button>

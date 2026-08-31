@@ -13,6 +13,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const lastTranscriptRef = useRef<string>("");
   const accumulatedFinalsRef = useRef<string>("");
   const isFinalizedRef = useRef<boolean>(false);
+  const wantListeningRef = useRef<boolean>(false);
   const onUserSpokeRef = useRef(onUserSpoke);
 
   // Audio queue for stream-to-sentence continuous playback
@@ -26,22 +27,49 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     onUserSpokeRef.current = onUserSpoke;
   }, [onUserSpoke]);
 
-  // 1. Preload and lock consistent deep, calm male voice
+  // 1. Preload and lock consistent deep, calm male voice across ALL platforms
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    const MALE_VOICE_KEYWORDS = [
+      "Male", "David", "Guy", "George", "James", "Daniel", "Alex", "Aaron",
+      "Mark", "Fred", "Thomas", "Richard", "Paul", "English Male",
+      // Android-specific male voices
+      "en-us-x-sfg", "en-us-x-tpd", "en-us-x-iol", "en-us-x-iom",
+      "en-gb-x-gba", "en-gb-x-gbb", "en-gb-x-rjs",
+    ];
+
+    const FEMALE_VOICE_KEYWORDS = [
+      "Female", "Samantha", "Karen", "Victoria", "Fiona", "Moira", "Tessa",
+      "Zira", "Susan", "Hazel", "Linda", "Catherine", "Ava", "Allison",
+      "Siri", "Google UK English Female",
+      "en-us-x-tpc", "en-us-x-sfg#female",
+    ];
 
     const selectTherapistVoice = () => {
       const voices = window.speechSynthesis.getVoices();
       if (!voices.length) return;
 
-      const maleVoice =
-        voices.find((v) => v.lang.startsWith("en") && (v.name.includes("David") || v.name.includes("Guy") || v.name.includes("George") || v.name.includes("Male") || v.name.includes("Natural (Male)"))) ||
-        voices.find((v) => v.lang.startsWith("en") && v.name.includes("Google UK English Male")) ||
-        voices.find((v) => v.lang.startsWith("en") && (v.name.includes("Daniel") || v.name.includes("Alex") || v.name.includes("Aaron"))) ||
-        voices.find((v) => v.lang.startsWith("en-US")) ||
-        voices[0];
+      const enVoices = voices.filter((v) => v.lang.startsWith("en"));
+      const nameLower = (v: SpeechSynthesisVoice) => v.name.toLowerCase();
 
-      selectedVoiceRef.current = maleVoice;
+      // Priority 1: Explicit male keyword match
+      const explicitMale = enVoices.find((v) =>
+        MALE_VOICE_KEYWORDS.some((kw) => v.name.includes(kw))
+      );
+      if (explicitMale) { selectedVoiceRef.current = explicitMale; return; }
+
+      // Priority 2: Any en voice that does NOT match a female keyword
+      const notFemale = enVoices.filter((v) =>
+        !FEMALE_VOICE_KEYWORDS.some((kw) => nameLower(v).includes(kw.toLowerCase()))
+      );
+      if (notFemale.length) { selectedVoiceRef.current = notFemale[0]; return; }
+
+      // Priority 3: Any English voice at all
+      if (enVoices.length) { selectedVoiceRef.current = enVoices[0]; return; }
+
+      // Absolute fallback
+      selectedVoiceRef.current = voices[0];
     };
 
     selectTherapistVoice();
@@ -64,6 +92,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
 
   // 3. Stop active recognition instance safely
   const stopRecognitionInternal = useCallback(() => {
+    wantListeningRef.current = false;
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
@@ -81,7 +110,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     setIsListening(false);
   }, []);
 
-  // 4. Start fresh recognition instance for the active turn
+
   const startListening = useCallback(async () => {
     if (typeof window === "undefined") return;
 
@@ -106,9 +135,14 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     lastTranscriptRef.current = "";
     accumulatedFinalsRef.current = "";
     isFinalizedRef.current = false;
+    wantListeningRef.current = true;
+
+    // Detect mobile: mobile Chrome kills continuous recognition randomly
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    // On mobile: use non-continuous mode and auto-restart to avoid garbled submissions
+    recognition.continuous = !isMobile;
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
@@ -145,39 +179,49 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         clearTimeout(silenceTimerRef.current);
       }
 
-      // Natural silence detection (1200ms) to allow comfortable speech pauses
+      // Silence detection: 2s on mobile (more forgiving), 1.2s on desktop
+      const silenceMs = isMobile ? 2000 : 1200;
       silenceTimerRef.current = setTimeout(() => {
         const textToSubmit = lastTranscriptRef.current.trim();
         if (textToSubmit.length >= 2 && !isFinalizedRef.current) {
           isFinalizedRef.current = true;
+          wantListeningRef.current = false;
           stopRecognitionInternal();
           setTranscript("");
           if (onUserSpokeRef.current) {
             onUserSpokeRef.current(textToSubmit);
           }
         }
-      }, 1200);
+      }, silenceMs);
     };
 
     recognition.onerror = (e: any) => {
-      if (e.error !== "no-speech") {
+      if (e.error !== "no-speech" && e.error !== "aborted") {
         setIsListening(false);
+        wantListeningRef.current = false;
       }
     };
 
     recognition.onend = () => {
-      // If recognition stopped unexpectedly before timer finalized speech, submit if valid
-      if (!isFinalizedRef.current && lastTranscriptRef.current.trim().length >= 2) {
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-        isFinalizedRef.current = true;
-        const textToSubmit = lastTranscriptRef.current.trim();
-        stopRecognitionInternal();
-        setTranscript("");
-        if (onUserSpokeRef.current) {
-          onUserSpokeRef.current(textToSubmit);
+      // On mobile, recognition ends randomly mid-sentence.
+      // Instead of submitting partial garbage, silently restart if we still want to listen.
+      if (wantListeningRef.current && !isFinalizedRef.current) {
+        try {
+          // Small delay to avoid rapid restart loops
+          setTimeout(() => {
+            if (wantListeningRef.current && !isFinalizedRef.current && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (restartErr) {
+                // If restart fails, give up gracefully
+                setIsListening(false);
+                wantListeningRef.current = false;
+              }
+            }
+          }, 100);
+        } catch (e) {
+          setIsListening(false);
+          wantListeningRef.current = false;
         }
       } else {
         setIsListening(false);
