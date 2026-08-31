@@ -331,7 +331,7 @@ export default function InterventionModal({
                       <h2 className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight">
                         What are you experiencing?
                       </h2>
-                      <p className="text-xs text-zinc-400 mt-0.5">
+                      <p className="hidden sm:block text-xs text-zinc-400 mt-0.5">
                         Select what you are feeling and calibrate baseline urge level.
                       </p>
                     </div>

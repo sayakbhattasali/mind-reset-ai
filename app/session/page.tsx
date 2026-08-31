@@ -391,20 +391,20 @@ function SessionContent() {
                   className="flex-1 min-h-0 h-full flex flex-col justify-between space-y-3 sm:space-y-4 overflow-y-auto"
                 >
                   <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 text-xs sm:text-xs font-mono text-amber-400 uppercase tracking-wider">
+                    <div className="hidden sm:inline-flex items-center gap-1.5 text-xs sm:text-xs font-mono text-amber-400 uppercase tracking-wider">
                       <Activity size={14} /> Intake Calibration
                     </div>
-                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-zinc-100 tracking-tight leading-tight">
+                    <h2 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-zinc-100 tracking-tight leading-tight">
                       What are you experiencing?
                     </h2>
-                    <p className="text-xs sm:text-sm text-zinc-400 leading-snug">
+                    <p className="hidden sm:block text-xs sm:text-sm text-zinc-400 leading-snug">
                       Choose your trigger and set your baseline intensity.
                     </p>
                   </div>
 
                   {/* Trigger Selection Grid */}
                   <div className="space-y-1.5">
-                    <span className="text-xs font-mono uppercase text-zinc-500">
+                    <span className="hidden sm:block text-xs font-mono uppercase text-zinc-500">
                       Select Trigger:
                     </span>
                     <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 sm:gap-2">
