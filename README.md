@@ -58,17 +58,18 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resil
 
 ```mermaid
 flowchart TD
-    A([User Voice Input]) -->|Web Speech API| B[Next.js Client]
-    B -->|POST /api/chat History + Context| C{Dual-Engine AI Pipeline}
-    C -->|Primary Sub-600ms| D[Groq LPU Engine]
-    C -.->|Secondary Fallback| E[Google Gemini 3.6 Flash]
-    D -->|Streamed Clinical Response| B
-    E -->|Streamed Clinical Response| B
-    B -->|POST /api/tts Sentence Chunks| F[Amazon Polly / REST TTS Bridge]
-    F -->|audio/mpeg MP3 Buffer| B
-    B -->|HTML5 Audio Playback + Lip-Sync| G[Dr. Marcus Avatar]
-    G -->|onended + 400ms Handshake| A
-    B -->|Log Outcome| H[(Firestore DB)]
+    A["User Voice Input"] -->|"Web Speech API"| B["Next.js Client"]
+    B -->|"POST /api/chat"| C{"Dual-Engine AI Pipeline"}
+    C -->|"Primary (Sub-600ms)"| D["Groq LPU Engine"]
+    C -.->|"Secondary Fallback"| E["Google Gemini 3.6 Flash"]
+    D -->|"Streamed Clinical Response"| B
+    E -->|"Streamed Clinical Response"| B
+    B -->|"POST /api/tts"| F["Amazon Polly / REST TTS Bridge"]
+    F -->|"audio/mpeg MP3 Buffer"| B
+    B -->|"Audio Playback + Lip-Sync"| G["Dr. Marcus Avatar"]
+    G -->|"onended, 400ms handshake"| A
+    B -->|"Log Outcome"| H[("Firestore DB")]
+
 ```
 
 ---
@@ -76,12 +77,12 @@ flowchart TD
 ## 💻 Tech Stack
 
 | Layer | Technologies |
-| :--- | :--- |
+| --- | --- |
 | **Framework** | Next.js 14 (App Router), React 18, TypeScript |
 | **Visuals & Animation** | Framer Motion, HTML5 Canvas, SVG Procedural Shaders |
 | **Styling & UI** | TailwindCSS, Lucide Icons |
 | **Primary AI Engine** | Groq Cloud SDK (`qwen/qwen3.8-27b`, `groq/compound-mini`, `llama-3.3-70b-versatile`) |
-| **Fallback AI Engine**| Google GenAI SDK (`gemini-3.6-flash`) |
+| **Fallback AI Engine** | Google GenAI SDK (`gemini-3.6-flash`) |
 | **Audio & Speech** | Serverless REST Audio Stream (Polly Brian), Web Speech API, HTML5 Audio |
 | **Database & Auth** | Google Firebase (Authentication & Cloud Firestore) |
 
@@ -90,55 +91,67 @@ flowchart TD
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **Node.js**: v18.18.0 or later
-- **npm** / **pnpm** / **yarn**
-- Free **[Groq API Key](https://console.groq.com)**
-- Free **[Google Gemini API Key](https://aistudio.google.com)**
-- Free **[Firebase Project](https://console.firebase.google.com)**
+
+* **Node.js**: v18.18.0 or later
+* **npm** / **pnpm** / **yarn**
+* Free **[Groq API Key](https://console.groq.com)**
+* Free **[Google Gemini API Key](https://aistudio.google.com)**
+* Free **[Firebase Project](https://console.firebase.google.com)**
 
 ### Installation
 
 1. **Clone the Repository:**
-   ```bash
-   git clone https://github.com/sayakbhattasali/mind-reset-ai.git
-   cd mind-reset-ai
-   ```
+```bash
+git clone [https://github.com/sayakbhattasali/mind-reset-ai.git](https://github.com/sayakbhattasali/mind-reset-ai.git)
+cd mind-reset-ai
+
+```
+
 
 2. **Install Dependencies:**
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+
+```
+
 
 3. **Configure Environment Variables:**
-   Create a `.env.local` file in the root directory:
-   ```env
-   # Primary AI Engine - Groq (https://console.groq.com)
-   GROQ_API_KEY=gsk_your_groq_api_key_here
+Create a `.env.local` file in the root directory:
+```env
+# Primary AI Engine - Groq ([https://console.groq.com](https://console.groq.com))
+GROQ_API_KEY=gsk_your_groq_api_key_here
 
-   # Secondary Fallback AI Engine - Google Gemini (https://aistudio.google.com)
-   GEMINI_API_KEY=your_gemini_api_key_here
+# Secondary Fallback AI Engine - Google Gemini ([https://aistudio.google.com](https://aistudio.google.com))
+GEMINI_API_KEY=your_gemini_api_key_here
 
-   # Firebase Configuration (https://console.firebase.google.com)
-   NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
-   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
-   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-   NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
-   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
-   ```
+# Firebase Configuration ([https://console.firebase.google.com](https://console.firebase.google.com))
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
+
+```
+
 
 4. **Run Development Server:**
-   ```bash
-   npm run dev
-   ```
-   Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+```bash
+npm run dev
 
+```
+
+
+Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 5. **Build for Production:**
-   ```bash
-   npm run build
-   npm run start
-   ```
+```bash
+npm run build
+npm run start
+
+```
+
+
 
 ---
 
@@ -172,24 +185,19 @@ mind-reset-ai/
 └── public/
     ├── mind-reset-bg.webp      # Premium ambient gradient background
     └── mind-reset-logo.png     # MindReset brand asset
+
 ```
 
 ---
 
 ## 🔒 Security & Privacy
 
-- **No Stored Transcripts**: Vocal interactions are processed in volatile memory and never retained for ad profiling.
-- **Client-Side Synthesis Guard**: User speech recognition stays local to the client browser until submitted to the clinical pipeline.
-- **Environment Isolation**: Private API keys are strictly confined to serverless API routes.
+* **No Stored Transcripts**: Vocal interactions are processed in volatile memory and never retained for ad profiling.
+* **Client-Side Synthesis Guard**: User speech recognition stays local to the client browser until submitted to the clinical pipeline.
+* **Environment Isolation**: Private API keys are strictly confined to serverless API routes.
 
 ---
 
 ## 📄 License
 
 Distributed under the **MIT License**. See `LICENSE` for more information.
-
----
-
-<div align="center">
-  <sub>Built by Sayak Bhattasali.</sub>
-</div>
