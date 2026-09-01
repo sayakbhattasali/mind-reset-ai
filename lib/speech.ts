@@ -59,19 +59,37 @@ const RANKED_MALE_PATTERNS = [
   { key: "michael", score: 540 }
 ];
 
+import { unlockAudioEngine } from "./audioUnlock";
+
 class SpeechEngine {
   private isMuted: boolean = false;
   private selectedVoice: SpeechSynthesisVoice | null = null;
   private isConfirmedMale: boolean = false;
+  private audioElement: HTMLAudioElement | null = null;
   private activeAudio: HTMLAudioElement | null = null;
 
   constructor() {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      this.refreshVoice();
-      window.speechSynthesis.onvoiceschanged = () => this.refreshVoice();
-      window.addEventListener("touchstart", () => this.refreshVoice(), { passive: true });
-      window.addEventListener("touchend", () => this.refreshVoice(), { passive: true });
-      window.addEventListener("click", () => this.refreshVoice(), { passive: true });
+    if (typeof window !== "undefined") {
+      this.audioElement = new Audio();
+      if ("speechSynthesis" in window) {
+        this.refreshVoice();
+        window.speechSynthesis.onvoiceschanged = () => this.refreshVoice();
+        window.addEventListener("touchstart", () => this.refreshVoice(), { passive: true });
+        window.addEventListener("touchend", () => this.refreshVoice(), { passive: true });
+        window.addEventListener("click", () => this.refreshVoice(), { passive: true });
+      }
+    }
+  }
+
+  public unlock() {
+    unlockAudioEngine();
+    if (!this.audioElement && typeof window !== "undefined") {
+      this.audioElement = new Audio();
+    }
+    if (this.audioElement) {
+      this.audioElement.play().then(() => {
+        this.audioElement?.pause();
+      }).catch(() => {});
     }
   }
 
@@ -171,7 +189,11 @@ class SpeechEngine {
         if (contentType.includes("audio")) {
           const blob = await res.blob();
           const audioUrl = URL.createObjectURL(blob);
-          const audio = new Audio(audioUrl);
+          
+          if (!this.audioElement) {
+            this.audioElement = new Audio();
+          }
+          const audio = this.audioElement;
           this.activeAudio = audio;
 
           audio.onplay = () => {
@@ -194,6 +216,7 @@ class SpeechEngine {
             this.fallbackClientSpeak(cleanText, onStart, onEnd);
           };
 
+          audio.src = audioUrl;
           await audio.play();
           return;
         }

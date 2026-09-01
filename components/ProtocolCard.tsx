@@ -2,6 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { ChevronRight, CheckCircle2 } from "lucide-react";
+import { unlockAudioEngine } from "@/lib/audioUnlock";
 
 interface ProtocolCardProps {
   id: string;
@@ -58,6 +59,7 @@ export default function ProtocolCard({
       {/* Action Button */}
       <Link
         href={sessionUrl}
+        onClick={() => unlockAudioEngine()}
         className="mt-7 w-full py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700/50 text-sm font-semibold transition-all flex items-center justify-center gap-2 group/btn active:scale-[0.99]"
       >
         <span>Begin Protocol</span>

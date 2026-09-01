@@ -90,6 +90,7 @@ export default function InterventionModal({
     stopListening,
     speak,
     speakStream,
+    unlockAudio,
   } = useVoiceTherapist((finalSpeech) => {
     handleSendMessage(finalSpeech);
   });
@@ -162,6 +163,8 @@ export default function InterventionModal({
   };
 
   const beginTherapy = async () => {
+    // Synchronously warm up browser audio permissions
+    unlockAudio();
     await requestMicAccess();
     setPhase("active");
     setIsLoading(false);
@@ -344,7 +347,10 @@ export default function InterventionModal({
                           <button
                             key={t.id}
                             type="button"
-                            onClick={() => setSelectedTrigger(t.id)}
+                            onClick={() => {
+                              unlockAudio();
+                              setSelectedTrigger(t.id);
+                            }}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
                               isSelected
                                 ? "bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm"
@@ -374,6 +380,7 @@ export default function InterventionModal({
                         min="1"
                         max="10"
                         value={preScore}
+                        onPointerDown={() => unlockAudio()}
                         onChange={(e) => setPreScore(Number(e.target.value))}
                         className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
                       />
@@ -387,7 +394,10 @@ export default function InterventionModal({
 
                     {/* Primary CTA */}
                     <button
-                      onClick={beginTherapy}
+                      onClick={() => {
+                        unlockAudio();
+                        beginTherapy();
+                      }}
                       className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)] text-sm active:scale-[0.99]"
                     >
                       Start Guided Voice Session

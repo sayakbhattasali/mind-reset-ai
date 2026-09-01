@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { unlockAudioEngine } from "@/lib/audioUnlock";
 import { db, auth, signInAndClaimSession, logCompletedSession } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -231,6 +232,7 @@ export default function AccountPage() {
             <h3 className="text-base sm:text-lg font-bold text-zinc-100">Completed De-Escalations</h3>
             <Link
               href="/session?trigger=Substance+Craving"
+              onClick={() => unlockAudioEngine()}
               className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-xs font-bold transition-all flex items-center gap-1.5 shadow-[0_0_20px_rgba(245,158,11,0.15)]"
             >
               <Play size={12} fill="currentColor" />
@@ -255,6 +257,7 @@ export default function AccountPage() {
               </div>
               <Link
                 href="/session?trigger=Substance+Craving"
+                onClick={() => unlockAudioEngine()}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-xs font-bold transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)]"
               >
                 <Play size={13} fill="currentColor" />
