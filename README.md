@@ -56,19 +56,28 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resil
 
 ## 🛠️ Architecture & Data Flow
 
-```mermaid
-graph TD
-    User[User Voice Input] -->|Web Speech API| Client[Next.js Client]
-    Client -->|API Chat Context| Pipeline{Dual-Engine AI Pipeline}
-    Pipeline -->|Primary Sub-600ms| Groq[Groq LPU Engine]
-    Pipeline -.->|Secondary Fallback| Gemini[Gemini 3.6 Flash]
-    Groq -->|Streamed Response| Client
-    Gemini -->|Streamed Response| Client
-    Client -->|API TTS Chunks| Polly[Amazon Polly TTS Bridge]
-    Polly -->|Audio MP3 Buffer| Client
-    Client -->|Audio Playback and LipSync| Avatar[Dr. Marcus Avatar]
-    Avatar -->|Playback Done Handshake| User
-    Client -->|Log Telemetry| DB[Cloud Firestore DB]
+```text
++-------------------------------------------------------------------------+
+|                            MindReset AI Engine                          |
++-------------------------------------------------------------------------+
+
+  [User Voice Input]
+          │
+          │ (Web Speech API)
+          ▼
+   [Next.js Client] ───────(POST /api/chat)───────► ❴Dual-Engine Pipeline❵
+          ▲                                                  │
+          │                                                  ├─► [Groq LPU Primary] (<600ms)
+          │                                                  └─► [Google Gemini 3.6] (Fallback)
+          │
+          ├────────(POST /api/tts)────────► [Amazon Polly REST Bridge]
+          │                                                  │
+          ├◄───────(audio/mpeg MP3 Stream)───────────────────┘
+          │
+          ├────────(Audio Playback + Lip-Sync)────► [Dr. Marcus Avatar]
+          │
+          └────────(Telemetry & Outcome Logging)──► [(Cloud Firestore DB)]
+
 ```
 
 ---
@@ -100,22 +109,23 @@ graph TD
 ### Installation
 
 1. **Clone the Repository:**
+
 ```bash
 git clone [https://github.com/sayakbhattasali/mind-reset-ai.git](https://github.com/sayakbhattasali/mind-reset-ai.git)
 cd mind-reset-ai
 
 ```
 
-
 2. **Install Dependencies:**
+
 ```bash
 npm install
 
 ```
 
-
 3. **Configure Environment Variables:**
 Create a `.env.local` file in the root directory:
+
 ```env
 # Primary AI Engine - Groq ([https://console.groq.com](https://console.groq.com))
 GROQ_API_KEY=gsk_your_groq_api_key_here
@@ -134,23 +144,22 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
 
 ```
 
-
 4. **Run Development Server:**
+
 ```bash
 npm run dev
 
 ```
 
-
 Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+
 5. **Build for Production:**
+
 ```bash
 npm run build
 npm run start
 
 ```
-
-
 
 ---
 
