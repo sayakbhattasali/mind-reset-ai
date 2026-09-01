@@ -17,35 +17,45 @@ export async function POST(req: Request) {
       .trim();
 
     if (!cleanText) {
-      return NextResponse.json({ error: "Empty text after sanitization" }, { status: 400 });
+      return NextResponse.json({ error: "Empty text" }, { status: 400 });
     }
 
-    // Direct, zero-key Kokoro-82M Male Voice Endpoint (Voice: am_adam / am_michael)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    // Direct Zero-Key StreamElements Polly male voice REST stream (Voice: Brian)
+    const encodedText = encodeURIComponent(cleanText);
+    const pollyUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=${encodedText}`;
 
-    try {
-      const response = await fetch("https://api.kokorotts.com/v1/audio/speech", {
-        method: "POST",
+    const response = await fetch(pollyUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Referer": "https://streamelements.com/",
+      },
+    });
+
+    if (response.ok) {
+      const audioBuffer = await response.arrayBuffer();
+      return new NextResponse(audioBuffer, {
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "audio/mpeg",
+          "Content-Length": audioBuffer.byteLength.toString(),
+          "Cache-Control": "public, max-age=86400",
         },
-        body: JSON.stringify({
-          model: "kokoro",
-          input: cleanText,
-          voice: "am_adam", // Explicitly deep male voice
-          response_format: "mp3",
-          speed: 0.9,
-        }),
-        signal: controller.signal,
       });
+    }
 
-      clearTimeout(timeoutId);
+    // High-Availability Fallback for long strings
+    const ttsRes = await fetch("https://ttsmp3.com/makemp3_new.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ msg: cleanText, lang: "Brian", source: "ttsmp3" }).toString(),
+    });
 
-      if (response.ok) {
-        const contentType = response.headers.get("Content-Type") || "";
-        if (contentType.includes("audio") || contentType.includes("mpeg") || contentType.includes("wav") || contentType.includes("octet-stream")) {
-          const audioBuffer = await response.arrayBuffer();
+    if (ttsRes.ok) {
+      const data = await ttsRes.json();
+      if (data?.URL) {
+        const audioRes = await fetch(data.URL);
+        if (audioRes.ok) {
+          const audioBuffer = await audioRes.arrayBuffer();
           return new NextResponse(audioBuffer, {
             headers: {
               "Content-Type": "audio/mpeg",
@@ -55,12 +65,11 @@ export async function POST(req: Request) {
           });
         }
       }
-    } catch (err) {
-      clearTimeout(timeoutId);
     }
 
-    return NextResponse.json({ fallback: true }, { status: 503 });
-  } catch {
-    return NextResponse.json({ fallback: true }, { status: 500 });
+    return NextResponse.json({ error: "TTS generation failed" }, { status: 502 });
+  } catch (err) {
+    console.error("TTS Server Route Error:", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
