@@ -57,19 +57,18 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resil
 ## 🛠️ Architecture & Data Flow
 
 ```mermaid
-flowchart TD
-    A["User Voice Input"] -->|"Web Speech API"| B["Next.js Client"]
-    B -->|"POST /api/chat"| C{"Dual-Engine AI Pipeline"}
-    C -->|"Primary (Sub-600ms)"| D["Groq LPU Engine"]
-    C -.->|"Secondary Fallback"| E["Google Gemini 3.6 Flash"]
-    D -->|"Streamed Clinical Response"| B
-    E -->|"Streamed Clinical Response"| B
-    B -->|"POST /api/tts"| F["Amazon Polly / REST TTS Bridge"]
-    F -->|"audio/mpeg MP3 Buffer"| B
-    B -->|"Audio Playback + Lip-Sync"| G["Dr. Marcus Avatar"]
-    G -->|"onended, 400ms handshake"| A
-    B -->|"Log Outcome"| H[("Firestore DB")]
-
+graph TD
+    User[User Voice Input] -->|Web Speech API| Client[Next.js Client]
+    Client -->|API Chat Context| Pipeline{Dual-Engine AI Pipeline}
+    Pipeline -->|Primary Sub-600ms| Groq[Groq LPU Engine]
+    Pipeline -.->|Secondary Fallback| Gemini[Google Gemini 3.6 Flash]
+    Groq -->|Streamed Response| Client
+    Gemini -->|Streamed Response| Client
+    Client -->|API TTS Chunks| Polly[Amazon Polly TTS Bridge]
+    Polly -->|Audio MP3 Buffer| Client
+    Client -->|Audio Playback and LipSync| Avatar[Dr. Marcus Avatar]
+    Avatar -->|Playback Done Handshake| User
+    Client -->|Log Telemetry| DB[Cloud Firestore DB]
 ```
 
 ---
