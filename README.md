@@ -58,17 +58,17 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resil
 
 ```mermaid
 flowchart TD
-    User["User Voice Input"] -->|Web Speech API| Client["Next.js Client"]
-    Client -->|POST /api/chat History + Context| Engine{"Dual-Engine AI Pipeline"}
-    Engine -->|Primary Sub-600ms| GroqServer["Groq LPU Engine"]
-    Engine -.->|Secondary Fallback| GeminiServer["Google Gemini 3.6 Flash"]
-    GroqServer -->|Streamed Clinical Response| Client
-    GeminiServer -->|Streamed Clinical Response| Client
-    Client -->|POST /api/tts Sentence Chunks| TTSAPI["Amazon Polly / REST TTS Bridge"]
-    TTSAPI -->|audio/mpeg MP3 Buffer| Client
-    Client -->|HTML5 Audio Playback + Lip-Sync| Avatar["Dr. Marcus Avatar"]
-    Avatar -->|onended + 400ms Handshake| User
-    Client -->|Log Outcome| Firebase[("Firestore DB")]
+    A([User Voice Input]) -->|Web Speech API| B[Next.js Client]
+    B -->|POST /api/chat History + Context| C{Dual-Engine AI Pipeline}
+    C -->|Primary Sub-600ms| D[Groq LPU Engine]
+    C -.->|Secondary Fallback| E[Google Gemini 3.6 Flash]
+    D -->|Streamed Clinical Response| B
+    E -->|Streamed Clinical Response| B
+    B -->|POST /api/tts Sentence Chunks| F[Amazon Polly / REST TTS Bridge]
+    F -->|audio/mpeg MP3 Buffer| B
+    B -->|HTML5 Audio Playback + Lip-Sync| G[Dr. Marcus Avatar]
+    G -->|onended + 400ms Handshake| A
+    B -->|Log Outcome| H[(Firestore DB)]
 ```
 
 ---
