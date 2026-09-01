@@ -40,7 +40,7 @@ function SessionContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Firebase session logging & Auth states
   const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -213,9 +213,9 @@ function SessionContent() {
   const beginTherapy = async () => {
     changePhase("active");
     const initialGreeting = `I'm right here with you. Let's calm this ${selectedTrigger} together. Take a slow, deep breath... and tell me how you feel.`;
-    
+
     setMessages([{ role: "assistant", content: initialGreeting }]);
-    
+
     // Request mic permission early (but don't start listening yet — doctor speaks first)
     try {
       await requestMicAccess();
@@ -288,7 +288,7 @@ function SessionContent() {
 
   return (
     <div className="fixed inset-0 w-full h-full bg-[#0E0E11] text-zinc-100 font-sans flex flex-col overflow-hidden select-none selection:bg-amber-500/30">
-      
+
       {/* 1. Fixed Top Header */}
       <header className="shrink-0 h-14 sm:h-16 bg-[#0E0E11]/90 backdrop-blur-xl border-b border-zinc-800/80 z-30 px-4 sm:px-8 flex items-center justify-between">
         <button
@@ -322,7 +322,7 @@ function SessionContent() {
       {/* 2. Main Viewport Container: 100% Screen-Fit Above The Fold */}
       <main className="flex-1 min-h-0 w-full max-w-6xl mx-auto p-3 sm:p-4 lg:p-6 flex flex-col overflow-hidden">
         <div className="w-full h-full min-h-0 flex flex-col lg:grid lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 items-stretch overflow-hidden">
-          
+
           {/* LEFT COLUMN: Doctor Avatar Studio */}
           <section className="flex-[2] min-h-0 lg:h-full lg:col-span-5 flex flex-col justify-between bg-gradient-to-b from-[#16161A] via-[#121216] to-[#0E0E11] border border-zinc-800 rounded-2xl sm:rounded-3xl p-3 sm:p-4 lg:p-6 shadow-xl relative overflow-hidden">
             {/* Ambient Breathing Halo Glow */}
@@ -380,7 +380,7 @@ function SessionContent() {
           {/* RIGHT COLUMN: Clinical Console */}
           <section className="flex-[3] min-h-0 lg:col-span-7 flex flex-col bg-[#16161A] border border-zinc-800 rounded-2xl sm:rounded-3xl p-4 sm:p-5 lg:p-6 backdrop-blur-xl shadow-xl overflow-hidden">
             <AnimatePresence mode="wait">
-              
+
               {/* STEP 1: Pre-Urge Calibration (100% Fits All Mobile Screens) */}
               {phase === "calibrate" && (
                 <motion.div
@@ -415,11 +415,10 @@ function SessionContent() {
                             key={t.id}
                             type="button"
                             onClick={() => setSelectedTrigger(t.id)}
-                            className={`flex items-center gap-2 px-3 py-2 sm:px-3 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border text-left ${
-                              isSelected
+                            className={`flex items-center gap-2 px-3 py-2 sm:px-3 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border text-left ${isSelected
                                 ? "bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm"
                                 : "bg-zinc-900/90 border-zinc-800 text-zinc-400 hover:bg-zinc-800/80 hover:text-white"
-                            }`}
+                              }`}
                           >
                             <t.icon size={14} className={`shrink-0 ${isSelected ? "text-amber-400" : "text-zinc-500"}`} />
                             <span className="truncate">{t.label}</span>
@@ -503,11 +502,10 @@ function SessionContent() {
                             {m.role === "user" ? "You" : "Dr. Marcus"}
                           </span>
                           <div
-                            className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm sm:text-base leading-relaxed ${
-                              m.role === "user"
+                            className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm sm:text-base leading-relaxed ${m.role === "user"
                                 ? "bg-amber-500/15 text-amber-100 border border-amber-500/25 rounded-tr-none shadow-sm"
                                 : "bg-zinc-900/90 text-zinc-200 border border-zinc-800 rounded-tl-none font-light shadow-sm"
-                            }`}
+                              }`}
                           >
                             {m.content}
                           </div>
@@ -530,11 +528,10 @@ function SessionContent() {
                     <div className="flex gap-1.5 sm:gap-2">
                       <button
                         onClick={isListening ? stopListening : startListening}
-                        className={`p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all shrink-0 ${
-                          isListening
+                        className={`p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border transition-all shrink-0 ${isListening
                             ? "bg-amber-500/20 border-amber-500/40 text-amber-400 animate-pulse shadow-[0_0_20px_rgba(245,158,11,0.25)]"
                             : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                        }`}
+                          }`}
                         title={isListening ? "Mute Microphone" : "Speak to Dr. Marcus"}
                       >
                         {isListening ? <MicOff size={17} /> : <Mic size={17} />}

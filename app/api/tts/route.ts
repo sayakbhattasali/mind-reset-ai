@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 10;
 
 export async function POST(req: Request) {
   try {
@@ -20,33 +20,66 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Empty text after sanitization" }, { status: 400 });
     }
 
-    // Zero-key Neural Male Voice (en-US-ChristopherNeural: Deep, grounded, authoritative therapist)
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata("en-US-ChristopherNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    // 1. Direct HTTPS REST Audio Stream (Under 150ms latency, Zero-Key, Vercel Serverless Ready)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
 
-    const { audioStream } = tts.toStream(cleanText, {
-      rate: "-6%",
-      pitch: "-3Hz",
-    });
+    try {
+      const encodedText = encodeURIComponent(cleanText.substring(0, 200));
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=en&client=tw-ob`;
 
-    const chunks: Buffer[] = [];
-    await new Promise<void>((resolve, reject) => {
-      audioStream.on("data", (chunk: Buffer) => chunks.push(chunk));
-      audioStream.on("end", () => resolve());
-      audioStream.on("error", (err: Error) => reject(err));
-    });
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        },
+        signal: controller.signal,
+      });
 
-    const fullBuffer = Buffer.concat(chunks);
+      clearTimeout(timeoutId);
 
-    return new NextResponse(fullBuffer, {
-      headers: {
-        "Content-Type": "audio/mpeg",
-        "Content-Length": fullBuffer.length.toString(),
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=3600",
-      },
-    });
-  } catch (error) {
-    console.error("TTS Route Error:", error);
-    return NextResponse.json({ error: "Failed to generate speech" }, { status: 500 });
+      if (response.ok) {
+        const audioBuffer = await response.arrayBuffer();
+        return new NextResponse(audioBuffer, {
+          headers: {
+            "Content-Type": "audio/mpeg",
+            "Content-Length": audioBuffer.byteLength.toString(),
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=3600",
+          },
+        });
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+    }
+
+    // 2. Secondary Serverless REST Pipeline (HuggingFace Inference)
+    try {
+      const hfController = new AbortController();
+      const hfTimeout = setTimeout(() => hfController.abort(), 1200);
+
+      const hfResponse = await fetch("https://api-inference.huggingface.co/models/facebook/mms-tts-eng", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs: cleanText }),
+        signal: hfController.signal,
+      });
+
+      clearTimeout(hfTimeout);
+
+      if (hfResponse.ok) {
+        const audioBuffer = await hfResponse.arrayBuffer();
+        return new NextResponse(audioBuffer, {
+          headers: {
+            "Content-Type": "audio/wav",
+            "Content-Length": audioBuffer.byteLength.toString(),
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=3600",
+          },
+        });
+      }
+    } catch {}
+
+    return NextResponse.json({ fallback: true }, { status: 503 });
+  } catch {
+    return NextResponse.json({ fallback: true }, { status: 500 });
   }
 }

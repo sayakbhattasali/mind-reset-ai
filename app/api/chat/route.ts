@@ -29,7 +29,7 @@ function getGroqApiKey(): string {
         return match[1].trim().replace(/^["']|["']$/g, "");
       }
     }
-  } catch (e) {}
+  } catch (e) { }
   return "";
 }
 

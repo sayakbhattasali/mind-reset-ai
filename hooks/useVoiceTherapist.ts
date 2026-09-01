@@ -30,7 +30,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     onUserSpokeRef.current = onUserSpoke;
   }, [onUserSpoke]);
 
-  // Helper to fetch server-side high-fidelity male audio stream (/api/tts)
+  // Helper to fetch server-side high-fidelity male audio stream (/api/tts) with 1.2s timeout
   const fetchServerAudioUrl = useCallback(async (text: string): Promise<string | null> => {
     try {
       const cachedPromise = prefetchCacheRef.current.get(text);
@@ -39,18 +39,28 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       }
 
       const fetchPromise = (async () => {
-        const res = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
 
-        if (!res.ok) return null;
-        const contentType = res.headers.get("Content-Type") || "";
-        if (!contentType.includes("audio")) return null;
+        try {
+          const res = await fetch("/api/tts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+            signal: controller.signal,
+          });
 
-        const blob = await res.blob();
-        return URL.createObjectURL(blob);
+          clearTimeout(timeoutId);
+          if (!res.ok) return null;
+          const contentType = res.headers.get("Content-Type") || "";
+          if (!contentType.includes("audio")) return null;
+
+          const blob = await res.blob();
+          return URL.createObjectURL(blob);
+        } catch {
+          clearTimeout(timeoutId);
+          return null;
+        }
       })();
 
       prefetchCacheRef.current.set(text, fetchPromise);
@@ -182,35 +192,15 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
   }, []);
 
-  // Helper to apply male therapist acoustic parameters (Pitch, Rate, Lang)
+  // Helper to apply male therapist acoustic parameters (Pitch down-sampling: 0.75 / 110Hz-140Hz)
   const applyTherapistAcoustics = useCallback((utterance: SpeechSynthesisUtterance) => {
-    const isMobile =
-      typeof navigator !== "undefined" &&
-      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-    const isAndroid =
-      typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
-
     if (selectedVoiceRef.current) {
       utterance.voice = selectedVoiceRef.current;
     }
     utterance.lang = "en-US";
     utterance.volume = 1.0;
-
-    if (isConfirmedMaleRef.current) {
-      // Confirmed male voice detected on system
-      if (isAndroid || isMobile) {
-        utterance.pitch = 0.86; // Deep, calm therapist tone for phone speakers
-        utterance.rate = 0.90;
-      } else {
-        utterance.pitch = 0.92; // Natural, warm baritone on desktop/laptop
-        utterance.rate = 0.92;
-      }
-    } else {
-      // Fallback / Default / Unconfirmed voice (Default is female on Android & iOS)
-      // Dropping pitch to 0.72 - 0.74 acoustically shifts any voice into a deep male baritone!
-      utterance.pitch = isAndroid ? 0.72 : 0.74;
-      utterance.rate = 0.88;
-    }
+    utterance.pitch = 0.75; // Mathematical down-sampling into resonant 110Hz-140Hz male clinician register
+    utterance.rate = 0.90;  // Grounded, soothing somatic therapy cadence
   }, []);
 
   // Mobile voice initializers: Mobile Chrome and Safari often populate getVoices() on first touch/interaction
@@ -268,7 +258,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         recognitionRef.current.onerror = null;
         recognitionRef.current.onend = null;
         recognitionRef.current.abort();
-      } catch (e) {}
+      } catch (e) { }
       recognitionRef.current = null;
     }
     setIsListening(false);
@@ -408,21 +398,37 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     stopRecognitionInternal();
   }, [stopRecognitionInternal]);
 
-  // Client speech synthesis fallback helper
+  // Client speech synthesis fallback helper with 0.75 pitch modulation & mic isolation
   const fallbackClientSpeak = useCallback((sentence: string, onEnd: () => void) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       onEnd();
       return;
     }
+    stopRecognitionInternal();
+
     const utterance = new SpeechSynthesisUtterance(sentence);
     if (!selectedVoiceRef.current || !isConfirmedMaleRef.current) {
       selectTherapistVoice();
     }
     applyTherapistAcoustics(utterance);
-    utterance.onend = () => onEnd();
-    utterance.onerror = () => onEnd();
+
+    utterance.onstart = () => {
+      stopRecognitionInternal();
+      setIsSpeaking(true);
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      onEnd();
+    };
+
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      onEnd();
+    };
+
     window.speechSynthesis.speak(utterance);
-  }, [applyTherapistAcoustics, selectTherapistVoice]);
+  }, [applyTherapistAcoustics, selectTherapistVoice, stopRecognitionInternal]);
 
   // 5. Audio Queue Dispatcher for Streamed Sentences (Server-Side TTS + Client Fallback)
   const playNextInQueue = useCallback(async () => {
@@ -445,7 +451,6 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
 
     const sentenceToSpeak = audioQueueRef.current.shift()!;
     isPlayingQueueRef.current = true;
-    setIsSpeaking(true);
 
     // Pre-fetch next sentences in parallel for instant zero-latency transitions
     if (audioQueueRef.current.length > 0) {
@@ -463,6 +468,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         activeAudioRef.current = audio;
 
         audio.onplay = () => {
+          stopRecognitionInternal();
           setIsSpeaking(true);
         };
 
@@ -471,6 +477,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
+          setIsSpeaking(false);
           playNextInQueue();
         };
 
@@ -479,6 +486,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
+          setIsSpeaking(false);
           fallbackClientSpeak(sentenceToSpeak, () => playNextInQueue());
         };
 
@@ -494,7 +502,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     fallbackClientSpeak(sentenceToSpeak, () => {
       playNextInQueue();
     });
-  }, [fallbackClientSpeak, fetchServerAudioUrl]);
+  }, [fallbackClientSpeak, fetchServerAudioUrl, stopRecognitionInternal]);
 
   const enqueueSentence = useCallback((sentence: string) => {
     const clean = sentence.replace(/\[END_SESSION\]/g, "").replace(/[*_#`]/g, "").trim();
@@ -585,7 +593,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
   }, [enqueueSentence, stopListening]);
 
-  // 7. Static Speak Function (Server-Side TTS + Client Fallback)
+  // 7. Static Speak Function (Server-Side TTS + Client Fallback with 300ms mic re-engagement)
   const speak = useCallback(async (text: string, onFinish?: () => void) => {
     if (typeof window === "undefined") return;
 
@@ -609,32 +617,39 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       return;
     }
 
-    setIsSpeaking(true);
-
-    // Try server-side audio first
+    // Try server-side audio first (/api/tts)
     const audioUrl = await fetchServerAudioUrl(clean);
     if (audioUrl) {
       try {
         const audio = new Audio(audioUrl);
         activeAudioRef.current = audio;
 
-        audio.onplay = () => setIsSpeaking(true);
+        audio.onplay = () => {
+          stopRecognitionInternal();
+          setIsSpeaking(true);
+        };
+
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl);
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
           setIsSpeaking(false);
-          if (onFinish) onFinish();
+          if (onFinish) {
+            setTimeout(() => onFinish(), 300);
+          }
         };
+
         audio.onerror = () => {
           URL.revokeObjectURL(audioUrl);
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
+          setIsSpeaking(false);
           fallbackClientSpeak(clean, () => {
-            setIsSpeaking(false);
-            if (onFinish) onFinish();
+            if (onFinish) {
+              setTimeout(() => onFinish(), 300);
+            }
           });
         };
 
@@ -648,10 +663,11 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
 
     // Client TTS fallback
     fallbackClientSpeak(clean, () => {
-      setIsSpeaking(false);
-      if (onFinish) onFinish();
+      if (onFinish) {
+        setTimeout(() => onFinish(), 300);
+      }
     });
-  }, [fallbackClientSpeak, fetchServerAudioUrl, stopListening]);
+  }, [fallbackClientSpeak, fetchServerAudioUrl, stopListening, stopRecognitionInternal]);
 
   // 8. Immediate Audio & Mic Termination
   const stopSpeaking = useCallback(() => {

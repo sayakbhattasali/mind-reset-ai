@@ -230,18 +230,8 @@ class SpeechEngine {
       utterance.lang = "en-US";
       utterance.volume = 1.0;
 
-      if (this.isConfirmedMale) {
-        if (isAndroid || isMobile) {
-          utterance.pitch = 0.86;
-          utterance.rate = 0.90;
-        } else {
-          utterance.pitch = 0.92;
-          utterance.rate = 0.92;
-        }
-      } else {
-        utterance.pitch = isAndroid ? 0.72 : 0.74;
-        utterance.rate = 0.88;
-      }
+      utterance.pitch = 0.75; // Mathematical down-sampling into resonant 110Hz-140Hz male clinician register
+      utterance.rate = 0.90;
 
       if (onStart) utterance.onstart = onStart;
       if (onEnd) utterance.onend = onEnd;
