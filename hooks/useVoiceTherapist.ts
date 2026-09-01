@@ -30,7 +30,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     onUserSpokeRef.current = onUserSpoke;
   }, [onUserSpoke]);
 
-  // Helper to fetch server-side high-fidelity male audio stream (OpenAI onyx / ElevenLabs)
+  // Helper to fetch server-side high-fidelity male audio stream (/api/tts)
   const fetchServerAudioUrl = useCallback(async (text: string): Promise<string | null> => {
     try {
       const cachedPromise = prefetchCacheRef.current.get(text);
@@ -454,7 +454,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       }
     }
 
-    // Try server-side audio first (OpenAI onyx / ElevenLabs)
+    // Try server-side audio first (/api/tts)
     const audioUrl = await fetchServerAudioUrl(sentenceToSpeak);
 
     if (audioUrl) {

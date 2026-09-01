@@ -158,7 +158,7 @@ class SpeechEngine {
       return;
     }
 
-    // 1. Attempt server-side neural male TTS (OpenAI onyx / ElevenLabs)
+    // 1. Attempt server-side neural male TTS (/api/tts)
     try {
       const res = await fetch("/api/tts", {
         method: "POST",
