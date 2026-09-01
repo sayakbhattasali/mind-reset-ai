@@ -1,4 +1,5 @@
 import Groq from "groq-sdk";
+import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 import path from "path";
 
@@ -72,8 +73,9 @@ export async function POST(req: Request) {
     }
 
     const groqApiKey = getEnvKey("GROQ_API_KEY");
+    const geminiApiKey = getEnvKey("GEMINI_API_KEY");
 
-    // 1. FAST GROQ STREAMING (High-Priority Active Models)
+    // 1. PRIMARY PROVIDER: GROQ LPU (Ultra-Fast Sub-600ms Inference)
     if (groqApiKey) {
       const groqModels = ["qwen/qwen3.8-27b", "groq/compound-mini", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
       const groq = new Groq({ apiKey: groqApiKey });
@@ -116,17 +118,63 @@ export async function POST(req: Request) {
             },
           });
         } catch (groqErr: any) {
-          console.error(`[API /api/chat] Groq ${modelId} error:`, JSON.stringify({
-            status: groqErr?.status,
-            message: groqErr?.message || groqErr,
-            error: groqErr?.error,
-          }));
+          console.warn(`[API /api/chat] Groq ${modelId} unavailable:`, groqErr?.message || groqErr);
         }
       }
     }
 
-    // 2. NO WORKING API - RETURN CLINICAL APOLOGY AND END SESSION
-    console.error("[API /api/chat] All AI providers failed. Returning fallback response.");
+    // 2. SECONDARY FALLBACK PROVIDER: GOOGLE GEMINI (High Availability Fallback)
+    if (geminiApiKey) {
+      try {
+        console.log("[API /api/chat] Groq unavailable. Activating Google Gemini 3.6 Flash fallback...");
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+
+        const geminiContents = formattedHistory.map((m: { role: "user" | "assistant"; content: string }) => ({
+          role: m.role === "assistant" ? ("model" as const) : ("user" as const),
+          parts: [{ text: m.content }],
+        }));
+
+        const responseStream = await ai.models.generateContentStream({
+          model: "gemini-3.6-flash",
+          contents: geminiContents,
+          config: {
+            systemInstruction: fullSystemPrompt,
+            temperature: 0.5,
+            maxOutputTokens: 100,
+          },
+        });
+
+        const readableStream = new ReadableStream({
+          async start(controller) {
+            try {
+              for await (const chunk of responseStream) {
+                const text = chunk.text || "";
+                if (text) {
+                  controller.enqueue(encoder.encode(text));
+                }
+              }
+              controller.close();
+            } catch (streamErr) {
+              console.error("[API /api/chat] Gemini stream error:", streamErr);
+              controller.error(streamErr);
+            }
+          },
+        });
+
+        return new Response(readableStream, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            "X-AI-Provider": "google-gemini-3.6-flash",
+          },
+        });
+      } catch (geminiErr: any) {
+        console.error("[API /api/chat] Gemini fallback error:", geminiErr?.message || geminiErr);
+      }
+    }
+
+    // 3. FINAL SAFETY FALLBACK
+    console.error("[API /api/chat] All AI providers (Groq & Gemini) failed. Returning clinical safety response.");
     return new Response(SERVER_ERROR_MESSAGE, {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });

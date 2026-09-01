@@ -6,7 +6,8 @@
 [![Next.js 14](https://img.shields.io/badge/Next.js-14.2-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-WebGL-black?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
-[![Groq LPU](https://img.shields.io/badge/Groq-Fast_Inference-F55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
+[![Groq LPU](https://img.shields.io/badge/Groq-Primary_LLM-F55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
+[![Google Gemini](https://img.shields.io/badge/Google_Gemini-3.6_Flash_Fallback-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://aistudio.google.com/)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth_%26_Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge)](LICENSE)
 
@@ -24,7 +25,7 @@
 
 **MindReset AI** is a real-time clinical somatic voice therapy application designed to defuse acute distress, cravings, panic, and anxiety in **90 seconds**.
 
-Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by Groq LPUs and low-latency audio pipelines—MindReset guides users through physical nervous system down-regulation (physiological sighs, vagal nerve resets, sensory grounding) through natural voice dialogue and real-time 3D avatar lip-sync.
+Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resilient dual-engine AI pipeline (Groq LPU primary + Google Gemini fallback) and low-latency audio streams—MindReset guides users through physical nervous system down-regulation (physiological sighs, vagal nerve resets, sensory grounding) through natural voice dialogue and real-time 3D avatar lip-sync.
 
 ---
 
@@ -39,8 +40,9 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by Groq LP
 - **WebGL / Three.js Canvas**: Interactive 3D avatar with realistic studio rim lighting, idle breathing motions, eye saccades, and head movements.
 - **Real-Time Lip-Sync**: Dynamic jaw/mouth oscillation synchronized directly to speech playback events.
 
-### ⚡ 3. Ultra-Fast Groq Inference (<600ms)
-- Streams somatic counseling responses in sub-600ms using Groq LPUs.
+### ⚡ 3. Resilient Dual-Engine AI Architecture
+- **Primary: Groq LPUs (<600ms)**: Blazing-fast inference via `qwen/qwen3.8-27b`, `groq/compound-mini`, and `llama-3.3-70b-versatile`.
+- **Secondary: Google Gemini Fallback**: Seamless, automatic rollover to `gemini-3.6-flash` via `@google/genai` if Groq ever faces rate limits or outages.
 - Concise, grounding clinical dialogues tailored to urge intensity (1–10 scale).
 
 ### 📊 4. Clinical Intake & Relief Assessment
@@ -57,8 +59,11 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by Groq LP
 ```mermaid
 graph TD
     User([User Voice Input]) -->|Web Speech API| Client[Next.js Client]
-    Client -->|POST /api/chat History + Context| GroqServer[Groq LPU LLM Engine]
+    Client -->|POST /api/chat History + Context| Engine{Dual-Engine AI Pipeline}
+    Engine -->|Primary <600ms| GroqServer[Groq LPU Engine]
+    Engine -.->|Secondary Fallback| GeminiServer[Google Gemini 3.6 Flash]
     GroqServer -->|Streamed Clinical Response| Client
+    GeminiServer -->|Streamed Clinical Response| Client
     Client -->|POST /api/tts Sentence Chunks| TTSAPI[Amazon Polly / REST TTS Bridge]
     TTSAPI -->|audio/mpeg MP3 Buffer| Client
     Client -->|HTML5 Audio Playback + Lip-Sync| Avatar[3D Avatar Dr. Marcus]
@@ -75,7 +80,8 @@ graph TD
 | **Framework** | Next.js 14 (App Router), React 18, TypeScript |
 | **3D Rendering** | Three.js, React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`) |
 | **Styling & UI** | TailwindCSS, Framer Motion, Lucide Icons |
-| **AI Inference** | Groq Cloud SDK (`qwen/qwen3.8-27b`, `llama-3.3-70b-versatile`) |
+| **Primary AI Engine** | Groq Cloud SDK (`qwen/qwen3.8-27b`, `groq/compound-mini`, `llama-3.3-70b-versatile`) |
+| **Fallback AI Engine**| Google GenAI SDK (`gemini-3.6-flash`) |
 | **Audio & Speech** | Serverless REST Audio Stream (Polly Brian), Web Speech API, HTML5 Audio |
 | **Database & Auth** | Google Firebase (Authentication & Cloud Firestore) |
 
@@ -87,6 +93,7 @@ graph TD
 - **Node.js**: v18.18.0 or later
 - **npm** / **pnpm** / **yarn**
 - Free **[Groq API Key](https://console.groq.com)**
+- Free **[Google Gemini API Key](https://aistudio.google.com)**
 - Free **[Firebase Project](https://console.firebase.google.com)**
 
 ### Installation
@@ -105,8 +112,11 @@ graph TD
 3. **Configure Environment Variables:**
    Create a `.env.local` file in the root directory:
    ```env
-   # Groq API Key (https://console.groq.com)
+   # Primary AI Engine - Groq (https://console.groq.com)
    GROQ_API_KEY=gsk_your_groq_api_key_here
+
+   # Secondary Fallback AI Engine - Google Gemini (https://aistudio.google.com)
+   GEMINI_API_KEY=your_gemini_api_key_here
 
    # Firebase Configuration (https://console.firebase.google.com)
    NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
