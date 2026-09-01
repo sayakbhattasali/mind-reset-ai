@@ -7,8 +7,10 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const [hasMicPermission, setHasMicPermission] = useState<boolean | null>(null);
   const [transcript, setTranscript] = useState("");
 
+  const isSpeakingRef = useRef<boolean>(false);
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const restartTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastTranscriptRef = useRef<string>("");
   const accumulatedFinalsRef = useRef<string>("");
   const isFinalizedRef = useRef<boolean>(false);
@@ -27,6 +29,12 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   useEffect(() => {
     onUserSpokeRef.current = onUserSpoke;
   }, [onUserSpoke]);
+
+  // Synchronized state & ref updater for strict half-duplex lock
+  const setSpeakingState = useCallback((speaking: boolean) => {
+    isSpeakingRef.current = speaking;
+    setIsSpeaking(speaking);
+  }, []);
 
   // 1. Helper to fetch server-side male audio stream (/api/tts) with 3.5s timeout & 2.5s retry
   const fetchServerAudioUrl = useCallback(async (text: string, timeoutMs = 3500): Promise<string | null> => {
@@ -92,12 +100,16 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
   };
 
-  // 3. Stop active recognition instance safely
+  // 3. Stop active recognition instance safely and cancel all pending restart timers
   const stopRecognitionInternal = useCallback(() => {
     wantListeningRef.current = false;
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
+    }
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
     }
     if (recognitionRef.current) {
       try {
@@ -112,9 +124,14 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     setIsListening(false);
   }, []);
 
-  // 4. Start Speech Recognition
+  // 4. Start Speech Recognition (Strict Half-Duplex Lock)
   const startListening = useCallback(async () => {
     if (typeof window === "undefined") return;
+
+    // STRICT HALF-DUPLEX LOCK: Abort immediately if audio is playing
+    if (isSpeakingRef.current) {
+      return;
+    }
 
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
@@ -124,15 +141,20 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    setIsSpeaking(false);
+    setSpeakingState(false);
     audioQueueRef.current = [];
     isPlayingQueueRef.current = false;
 
-    // Clean up previous instance
+    // Clean up previous instance and timers
     stopRecognitionInternal();
 
     const permitted = hasMicPermission ?? (await requestMicAccess());
     if (!permitted) return;
+
+    // Re-verify speaking lock after async mic check
+    if (isSpeakingRef.current) {
+      return;
+    }
 
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -210,24 +232,20 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     };
 
     recognition.onend = () => {
-      if (wantListeningRef.current && !isFinalizedRef.current) {
-        try {
-          setTimeout(() => {
-            if (wantListeningRef.current && !isFinalizedRef.current && recognitionRef.current) {
-              try {
-                recognitionRef.current.start();
-              } catch (restartErr) {
-                setIsListening(false);
-                wantListeningRef.current = false;
-              }
+      setIsListening(false);
+      // STRICT HALF-DUPLEX: ONLY restart if actively requested, NOT speaking, and not finalized
+      if (wantListeningRef.current && !isSpeakingRef.current && !isFinalizedRef.current) {
+        if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+        restartTimerRef.current = setTimeout(() => {
+          if (wantListeningRef.current && !isSpeakingRef.current && !isFinalizedRef.current && recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (restartErr) {
+              setIsListening(false);
+              wantListeningRef.current = false;
             }
-          }, 100);
-        } catch (e) {
-          setIsListening(false);
-          wantListeningRef.current = false;
-        }
-      } else {
-        setIsListening(false);
+          }
+        }, 200);
       }
     };
 
@@ -238,20 +256,20 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     } catch (err) {
       console.warn("Recognition start exception:", err);
     }
-  }, [hasMicPermission, stopRecognitionInternal]);
+  }, [hasMicPermission, setSpeakingState, stopRecognitionInternal]);
 
   const stopListening = useCallback(() => {
     stopRecognitionInternal();
   }, [stopRecognitionInternal]);
 
-  // 5. Audio Queue Dispatcher (Pure Server-Side Male Stream — NO Client Female Voice Fallback)
+  // 5. Audio Queue Dispatcher (Pure Server-Side Male Stream — Strict Speech Handshake)
   const playNextInQueue = useCallback(async () => {
     if (typeof window === "undefined") return;
 
     if (audioQueueRef.current.length === 0) {
       if (isStreamCompleteRef.current) {
         isPlayingQueueRef.current = false;
-        setIsSpeaking(false);
+        setSpeakingState(false);
         if (onQueueFinishedRef.current) {
           const cb = onQueueFinishedRef.current;
           onQueueFinishedRef.current = null;
@@ -281,9 +299,13 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         const audio = new Audio(audioUrl);
         activeAudioRef.current = audio;
 
+        // LOCK SPEECH HANDSHAKE IMMEDIATELY BEFORE PLAY
+        setSpeakingState(true);
+        stopRecognitionInternal();
+
         audio.onplay = () => {
+          setSpeakingState(true);
           stopRecognitionInternal();
-          setIsSpeaking(true);
         };
 
         audio.onended = () => {
@@ -291,7 +313,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
-          setIsSpeaking(false);
+          setSpeakingState(false);
           playNextInQueue();
         };
 
@@ -300,8 +322,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
-          setIsSpeaking(false);
-          // Advance queue directly without female TTS fallback
+          setSpeakingState(false);
           playNextInQueue();
         };
 
@@ -314,8 +335,9 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
 
     // If server audio failed after retry, advance queue cleanly
+    setSpeakingState(false);
     playNextInQueue();
-  }, [fetchServerAudioUrl, stopRecognitionInternal]);
+  }, [fetchServerAudioUrl, setSpeakingState, stopRecognitionInternal]);
 
   const enqueueSentence = useCallback((sentence: string) => {
     const clean = sentence.replace(/\[END_SESSION\]/g, "").replace(/[*_#`]/g, "").trim();
@@ -396,7 +418,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     } finally {
       isStreamCompleteRef.current = true;
       if (!isPlayingQueueRef.current && audioQueueRef.current.length === 0) {
-        setIsSpeaking(false);
+        setSpeakingState(false);
         if (onQueueFinishedRef.current) {
           const cb = onQueueFinishedRef.current;
           onQueueFinishedRef.current = null;
@@ -404,12 +426,14 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         }
       }
     }
-  }, [enqueueSentence, stopListening]);
+  }, [enqueueSentence, setSpeakingState, stopListening]);
 
-  // 7. Static Speak Function (Pure Server-Side Male TTS Stream with 300ms mic re-engagement)
+  // 7. Static Speak Function (Pure Server-Side Male TTS Stream with Controlled 400ms Handshake)
   const speak = useCallback(async (text: string, onFinish?: () => void) => {
     if (typeof window === "undefined") return;
 
+    // Immediately stop any active recognition or playback
+    stopListening();
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
       activeAudioRef.current.src = "";
@@ -418,7 +442,6 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    stopListening();
 
     audioQueueRef.current = [];
     isPlayingQueueRef.current = false;
@@ -436,9 +459,13 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         const audio = new Audio(audioUrl);
         activeAudioRef.current = audio;
 
+        // LOCK SPEECH HANDSHAKE IMMEDIATELY BEFORE PLAY
+        setSpeakingState(true);
+        stopRecognitionInternal();
+
         audio.onplay = () => {
+          setSpeakingState(true);
           stopRecognitionInternal();
-          setIsSpeaking(true);
         };
 
         audio.onended = () => {
@@ -446,9 +473,13 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
-          setIsSpeaking(false);
+          setSpeakingState(false);
           if (onFinish) {
-            setTimeout(() => onFinish(), 300);
+            setTimeout(() => {
+              if (!isSpeakingRef.current) {
+                onFinish();
+              }
+            }, 400);
           }
         };
 
@@ -457,9 +488,13 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
-          setIsSpeaking(false);
+          setSpeakingState(false);
           if (onFinish) {
-            setTimeout(() => onFinish(), 300);
+            setTimeout(() => {
+              if (!isSpeakingRef.current) {
+                onFinish();
+              }
+            }, 400);
           }
         };
 
@@ -470,10 +505,11 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       }
     }
 
+    setSpeakingState(false);
     if (onFinish) {
-      setTimeout(() => onFinish(), 300);
+      setTimeout(() => onFinish(), 400);
     }
-  }, [fetchServerAudioUrl, stopListening, stopRecognitionInternal]);
+  }, [fetchServerAudioUrl, setSpeakingState, stopListening, stopRecognitionInternal]);
 
   // 8. Immediate Audio & Mic Termination
   const stopSpeaking = useCallback(() => {
@@ -489,8 +525,8 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     isPlayingQueueRef.current = false;
     isStreamCompleteRef.current = true;
     onQueueFinishedRef.current = null;
-    setIsSpeaking(false);
-  }, []);
+    setSpeakingState(false);
+  }, [setSpeakingState]);
 
   const terminateAllAudio = useCallback(() => {
     stopSpeaking();

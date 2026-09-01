@@ -216,14 +216,14 @@ function SessionContent() {
 
     setMessages([{ role: "assistant", content: initialGreeting }]);
 
-    // Request mic permission early (but don't start listening yet — doctor speaks first)
+    // 1. First ensure mic permission is granted and cleanly resting (not actively recording)
     try {
       await requestMicAccess();
     } catch (e) {
       console.warn("Microphone access declined or unavailable.");
     }
 
-    // Speak opening greeting with high-fidelity server TTS and start listening when done
+    // 2. Play greeting strictly to completion BEFORE engaging listener
     speak(initialGreeting, () => {
       startListening();
     });
