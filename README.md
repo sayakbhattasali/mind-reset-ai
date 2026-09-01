@@ -5,7 +5,7 @@
 
 [![Next.js 14](https://img.shields.io/badge/Next.js-14.2-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Three.js](https://img.shields.io/badge/Three.js-WebGL-black?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Groq LPU](https://img.shields.io/badge/Groq-Primary_LLM-F55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
 [![Google Gemini](https://img.shields.io/badge/Google_Gemini-3.6_Flash_Fallback-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://aistudio.google.com/)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth_%26_Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
@@ -25,7 +25,7 @@
 
 **MindReset AI** is a real-time clinical somatic voice therapy application designed to defuse acute distress, cravings, panic, and anxiety in **90 seconds**.
 
-Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resilient dual-engine AI pipeline (Groq LPU primary + Google Gemini fallback) and low-latency audio streams—MindReset guides users through physical nervous system down-regulation (physiological sighs, vagal nerve resets, sensory grounding) through natural voice dialogue and real-time 3D avatar lip-sync.
+Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resilient dual-engine AI pipeline (Groq LPU primary + Google Gemini fallback) and low-latency audio streams—MindReset guides users through physical nervous system down-regulation (physiological sighs, vagal nerve resets, sensory grounding) through natural voice dialogue and real-time avatar lip-sync.
 
 ---
 
@@ -36,9 +36,9 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resil
 - **Deep Clinical Male Voice**: Guaranteed masculine clinician voice across laptops, iPhones, and Android devices via high-speed zero-key serverless audio streaming.
 - **Microphone Echo Isolation**: 400ms controlled handshake prevents Dr. Marcus's voice from echoing into speech recognition.
 
-### 👤 2. Procedural 3D Human Avatar (Dr. Marcus)
-- **WebGL / Three.js Canvas**: Interactive 3D avatar with realistic studio rim lighting, idle breathing motions, eye saccades, and head movements.
-- **Real-Time Lip-Sync**: Dynamic jaw/mouth oscillation synchronized directly to speech playback events.
+### 👤 2. Procedural Human Avatar (Dr. Marcus)
+- **Interactive Somatic Avatar**: Real-time responsive visual clinician with organic double-blinking, attentive eye gaze saccades, idle micro-breathing motion, and expressive listening states.
+- **Real-Time Lip-Sync**: Dynamic jaw and mouth oscillation synchronized directly to audio playback events.
 
 ### ⚡ 3. Resilient Dual-Engine AI Architecture
 - **Primary: Groq LPUs (<600ms)**: Blazing-fast inference via `qwen/qwen3.8-27b`, `groq/compound-mini`, and `llama-3.3-70b-versatile`.
@@ -66,7 +66,7 @@ graph TD
     GeminiServer -->|Streamed Clinical Response| Client
     Client -->|POST /api/tts Sentence Chunks| TTSAPI[Amazon Polly / REST TTS Bridge]
     TTSAPI -->|audio/mpeg MP3 Buffer| Client
-    Client -->|HTML5 Audio Playback + Lip-Sync| Avatar[3D Avatar Dr. Marcus]
+    Client -->|HTML5 Audio Playback + Lip-Sync| Avatar[Dr. Marcus Avatar]
     Avatar -->|onended + 400ms Handshake| User
     Client -->|Log Outcome| Firebase[(Firestore DB)]
 ```
@@ -78,8 +78,8 @@ graph TD
 | Layer | Technologies |
 | :--- | :--- |
 | **Framework** | Next.js 14 (App Router), React 18, TypeScript |
-| **3D Rendering** | Three.js, React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`) |
-| **Styling & UI** | TailwindCSS, Framer Motion, Lucide Icons |
+| **Visuals & Animation** | Framer Motion, HTML5 Canvas, SVG Procedural Shaders |
+| **Styling & UI** | TailwindCSS, Lucide Icons |
 | **Primary AI Engine** | Groq Cloud SDK (`qwen/qwen3.8-27b`, `groq/compound-mini`, `llama-3.3-70b-versatile`) |
 | **Fallback AI Engine**| Google GenAI SDK (`gemini-3.6-flash`) |
 | **Audio & Speech** | Serverless REST Audio Stream (Polly Brian), Web Speech API, HTML5 Audio |
