@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { unlockAudioEngine } from "@/lib/audioUnlock";
 import HumanAvatar from "@/components/HumanAvatar";
 import {
   Brain,
@@ -290,7 +289,6 @@ export default function HowItWorksPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
             <Link
               href="/session?trigger=Substance+Craving"
-              onClick={() => unlockAudioEngine()}
               className="w-full sm:w-auto py-4 px-8 rounded-full font-bold text-sm sm:text-base bg-[#FF8811] hover:bg-amber-400 text-zinc-950 flex items-center justify-center gap-2 shadow-[0_4px_25px_rgba(245,158,11,0.3)] transition-all active:scale-[0.98]"
             >
               <span>Start 90s Reset</span>

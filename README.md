@@ -153,19 +153,20 @@ mind-reset-ai/
 │   ├── session/page.tsx        # Somatic therapy session & calibration flow
 │   ├── protocols/page.tsx      # Emergency somatic reset protocols
 │   ├── how-it-works/page.tsx   # Neurobiology & clinical mechanics
+│   ├── about/page.tsx          # Clinical mission & team overview
+│   ├── account/page.tsx        # Authenticated user telemetry & history
 │   ├── layout.tsx              # Root layout & theme providers
 │   └── page.tsx                # High-conversion landing page
 ├── components/
 │   ├── HumanAvatar.tsx         # Procedural 3D humanoid avatar with lip-sync
-│   ├── AvatarCanvas.tsx        # Three.js fiber canvas wrapper
-│   ├── BreathingRing.tsx       # Interactive physiological sigh pacer
 │   ├── HeroSection.tsx         # Hero section & somatic trigger selectors
 │   ├── Navbar.tsx              # Navigation bar with auth status
+│   ├── ProtocolCard.tsx        # Interactive protocol selection cards
 │   └── Footer.tsx              # Application footer
 ├── hooks/
 │   └── useVoiceTherapist.ts    # Half-duplex voice state machine & mic manager
 ├── lib/
-│   ├── firebase.ts             # Firebase client SDK initialization
+│   ├── firebase.ts             # Firebase client SDK initialization & Firestore
 │   ├── protocols.ts            # Clinical reset protocol data
 │   └── speech.ts               # Audio playback & acoustic helpers
 └── public/

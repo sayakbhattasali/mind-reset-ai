@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { SILENT_AUDIO_URI } from "@/lib/audioUnlock";
 
 export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -21,35 +20,8 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const isPlayingQueueRef = useRef<boolean>(false);
   const isStreamCompleteRef = useRef<boolean>(false);
   const onQueueFinishedRef = useRef<(() => void) | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const prefetchCacheRef = useRef<Map<string, Promise<string | null>>>(new Map());
-
-  // Instant synchronous unlock on user gesture to establish browser trust
-  const unlockAudio = useCallback(() => {
-    if (typeof window === "undefined") return;
-    try {
-      // 1. Instantly create and play a tiny silent buffer synchronously on user tap
-      const silentAudio = new Audio(SILENT_AUDIO_URI);
-      silentAudio.play().then(() => {
-        silentAudio.pause();
-      }).catch(() => {
-        // Ignore error, just warming up the browser audio policy
-      });
-
-      // 2. Prime the persistent single Audio instance for this session
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-      }
-      audioRef.current.play().then(() => {
-        audioRef.current?.pause();
-      }).catch(() => {});
-
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.resume();
-      }
-    } catch {}
-  }, []);
 
   // Keep callback ref fresh across state changes
   useEffect(() => {
@@ -306,10 +278,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
 
     if (audioUrl) {
       try {
-        if (!audioRef.current) {
-          audioRef.current = new Audio();
-        }
-        const audio = audioRef.current;
+        const audio = new Audio(audioUrl);
         activeAudioRef.current = audio;
 
         audio.onplay = () => {
@@ -318,9 +287,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         };
 
         audio.onended = () => {
-          if (audioUrl.startsWith("blob:")) {
-            URL.revokeObjectURL(audioUrl);
-          }
+          URL.revokeObjectURL(audioUrl);
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
@@ -329,9 +296,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
         };
 
         audio.onerror = () => {
-          if (audioUrl.startsWith("blob:")) {
-            URL.revokeObjectURL(audioUrl);
-          }
+          URL.revokeObjectURL(audioUrl);
           if (activeAudioRef.current === audio) {
             activeAudioRef.current = null;
           }
@@ -339,12 +304,11 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
           playNextInQueue();
         };
 
-        audio.src = audioUrl;
         await audio.play();
         return;
       } catch (audioErr) {
         console.warn("Audio playback error:", audioErr);
-        if (audioUrl && audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
       }
     }
 
@@ -446,7 +410,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
   }, [enqueueSentence, setSpeakingState, stopListening]);
 
-  // 7. Static Speak Function (Reusing Single Unlocked Audio Instance)
+  // 7. Static Speak Function (Synchronous Audio Instantiation to Preserve Mobile Autoplay Gestures)
   const speak = useCallback(async (text: string, onFinish?: () => void) => {
     if (typeof window === "undefined") return;
 
@@ -474,11 +438,8 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       return;
     }
 
-    // Reuse persistent Audio instance that holds trusted browser user gesture
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-    }
-    const audio = audioRef.current;
+    // Synchronously instantiate Audio within the user-gesture call stack
+    const audio = new Audio();
     activeAudioRef.current = audio;
 
     audio.onplay = () => {
@@ -565,6 +526,5 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     speakStream,
     stopSpeaking,
     terminateAllAudio,
-    unlockAudio,
   };
 }

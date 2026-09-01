@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { unlockAudioEngine } from "@/lib/audioUnlock";
 
 interface NavbarProps {
   onOpenSession?: () => void;
@@ -82,7 +81,6 @@ export default function Navbar({ onOpenSession }: NavbarProps) {
         <div className="flex items-center gap-3 shrink-0">
           <Link
             href="/session?trigger=Substance+Craving"
-            onClick={() => unlockAudioEngine()}
             className="hidden md:inline-flex bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/60 text-xs font-medium px-4 py-2 rounded-full transition-all active:scale-[0.98] whitespace-nowrap"
           >
             Start Reset

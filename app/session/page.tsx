@@ -59,7 +59,6 @@ function SessionContent() {
     speak,
     speakStream,
     terminateAllAudio,
-    unlockAudio,
   } = useVoiceTherapist((finalSpeech) => {
     handleSendMessage(finalSpeech);
   });
@@ -210,9 +209,6 @@ function SessionContent() {
   };
 
   const beginTherapy = () => {
-    // 1. Instantly unlock audio engine synchronously on user tap
-    unlockAudio();
-
     changePhase("active");
     const initialGreeting = `I'm right here with you. Let's calm this ${selectedTrigger} together. Take a slow, deep breath... and tell me how you feel.`;
 
@@ -368,7 +364,7 @@ function SessionContent() {
                     </p>
                   </div>
 
-                    {/* Trigger Selection Grid */}
+                  {/* Trigger Selection Grid */}
                   <div className="space-y-1.5">
                     <span className="hidden sm:block text-xs font-mono uppercase text-zinc-500">
                       Select Trigger:
@@ -380,10 +376,7 @@ function SessionContent() {
                           <button
                             key={t.id}
                             type="button"
-                            onClick={() => {
-                              unlockAudio();
-                              setSelectedTrigger(t.id);
-                            }}
+                            onClick={() => setSelectedTrigger(t.id)}
                             className={`flex items-center gap-2 px-3 py-2 sm:px-3 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border text-left ${isSelected
                                 ? "bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm"
                                 : "bg-zinc-900/90 border-zinc-800 text-zinc-400 hover:bg-zinc-800/80 hover:text-white"
@@ -413,7 +406,6 @@ function SessionContent() {
                       min="1"
                       max="10"
                       value={preScore}
-                      onPointerDown={() => unlockAudio()}
                       onChange={(e) => setPreScore(Number(e.target.value))}
                       className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
                     />
@@ -421,10 +413,7 @@ function SessionContent() {
 
                   {/* Primary CTA: Always Visible On Mobile Without Scrolling */}
                   <button
-                    onClick={() => {
-                      unlockAudio();
-                      beginTherapy();
-                    }}
+                    onClick={beginTherapy}
                     className="w-full py-3 sm:py-3.5 bg-[#FF8811] hover:bg-amber-400 text-zinc-950 font-bold rounded-xl sm:rounded-2xl transition-all shadow-[0_4px_25px_rgba(255,136,17,0.25)] text-sm sm:text-base flex items-center justify-center gap-2 active:scale-[0.98] shrink-0"
                   >
                     <span>Start Voice Session</span>

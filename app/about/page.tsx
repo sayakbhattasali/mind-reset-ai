@@ -3,7 +3,6 @@ import React from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { unlockAudioEngine } from "@/lib/audioUnlock";
 import { Brain, Heart, ArrowLeft, CheckCircle2, ShieldCheck, Eye } from "lucide-react";
 
 export default function AboutPage() {
@@ -97,7 +96,6 @@ export default function AboutPage() {
           </p>
           <Link
             href="/session?trigger=Panic+%26+Anxiety"
-            onClick={() => unlockAudioEngine()}
             className="inline-block px-8 py-3.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold rounded-2xl transition-all shadow-[0_0_25px_rgba(245,158,11,0.15)] active:scale-[0.99]"
           >
             Start a Guided Session
