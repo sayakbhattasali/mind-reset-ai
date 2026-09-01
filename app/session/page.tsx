@@ -187,8 +187,6 @@ function SessionContent() {
           });
           if (shouldEnd) {
             endSession();
-          } else {
-            startListening();
           }
         }
       );
@@ -216,10 +214,8 @@ function SessionContent() {
 
     setMessages([{ role: "assistant", content: initialGreeting }]);
 
-    // Speak greeting. The mic will ONLY activate inside this callback once audio finishes.
-    speak(initialGreeting, () => {
-      startListening();
-    });
+    // Speak opening greeting. User will manually tap the mic when ready to respond.
+    speak(initialGreeting);
   };
 
   const endSession = async () => {
