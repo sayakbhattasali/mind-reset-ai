@@ -61,7 +61,7 @@ graph TD
     User[User Voice Input] -->|Web Speech API| Client[Next.js Client]
     Client -->|API Chat Context| Pipeline{Dual-Engine AI Pipeline}
     Pipeline -->|Primary Sub-600ms| Groq[Groq LPU Engine]
-    Pipeline -.->|Secondary Fallback| Gemini[Google Gemini 3.6 Flash]
+    Pipeline -.->|Secondary Fallback| Gemini[Gemini 3.6 Flash]
     Groq -->|Streamed Response| Client
     Gemini -->|Streamed Response| Client
     Client -->|API TTS Chunks| Polly[Amazon Polly TTS Bridge]
