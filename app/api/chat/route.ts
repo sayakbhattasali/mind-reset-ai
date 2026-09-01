@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 const SYSTEM_PROMPT = `
 You are Dr. Marcus, an empathetic, clinical somatic therapist for MindReset.
@@ -16,20 +17,20 @@ RULES:
 
 const SERVER_ERROR_MESSAGE = "I apologize, but I am unable to connect to the AI server right now. Wishing you peace and strength. [END_SESSION]";
 
-function getGroqApiKey(): string {
-  if (process.env.GROQ_API_KEY) {
-    return process.env.GROQ_API_KEY.trim();
+function getEnvKey(keyName: string): string {
+  if (process.env[keyName]) {
+    return process.env[keyName]!.trim();
   }
   try {
     const envPath = path.join(process.cwd(), ".env.local");
     if (fs.existsSync(envPath)) {
       const content = fs.readFileSync(envPath, "utf-8");
-      const match = content.match(/GROQ_API_KEY\s*=\s*([^\r\n]+)/);
+      const match = content.match(new RegExp(`${keyName}\\s*=\\s*([^\\r\\n]+)`));
       if (match && match[1]) {
         return match[1].trim().replace(/^["']|["']$/g, "");
       }
     }
-  } catch (e) { }
+  } catch (e) {}
   return "";
 }
 
@@ -47,10 +48,22 @@ export async function POST(req: Request) {
       });
     }
 
-    const lastUserMessage = messages.length > 0 && messages[messages.length - 1]?.role === "user"
-      ? String(messages[messages.length - 1].content).trim()
-      : "";
+    // Sanitize and filter message history (last 10 messages max to prevent token blowup)
+    const formattedHistory = messages
+      .filter((m: any) => m && typeof m.content === "string" && m.content.trim() && (m.role === "user" || m.role === "assistant"))
+      .slice(-10)
+      .map((m: any) => ({
+        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: String(m.content).trim(),
+      }));
 
+    if (formattedHistory.length === 0) {
+      return new Response(`I'm right here with you. Let's calm this ${trigger} together. Take a slow, deep breath... and tell me how you feel.`, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+
+    const lastUserMessage = formattedHistory[formattedHistory.length - 1]?.content || "";
     const userWantsToEnd = /\b(end|stop|bye|goodbye|done|quit|finish|exit|wrap up|leave|i feel better|i'm good|i am good|thanks that helped)\b/i.test(lastUserMessage);
 
     let fullSystemPrompt = `${SYSTEM_PROMPT}\nPatient Context: Focus Target: "${trigger}", Urge Severity: ${preScore}/10.`;
@@ -58,18 +71,11 @@ export async function POST(req: Request) {
       fullSystemPrompt += `\nInstruction: The patient is concluding the session. Warmly validate their grounding and append [END_SESSION] at the end.`;
     }
 
-    const formattedHistory = messages
-      .filter((m: any) => m && m.content && (m.role === "user" || m.role === "assistant"))
-      .map((m: any) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: String(m.content).trim(),
-      }));
+    const groqApiKey = getEnvKey("GROQ_API_KEY");
 
-    const groqApiKey = getGroqApiKey();
-
-    // 1. FAST GROQ STREAMING
+    // 1. FAST GROQ STREAMING (High-Priority Active Models)
     if (groqApiKey) {
-      const groqModels = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"];
+      const groqModels = ["qwen/qwen3.8-27b", "groq/compound-mini", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
       const groq = new Groq({ apiKey: groqApiKey });
 
       for (const modelId of groqModels) {
@@ -77,10 +83,7 @@ export async function POST(req: Request) {
           const stream = await groq.chat.completions.create({
             messages: [
               { role: "system", content: fullSystemPrompt },
-              ...formattedHistory.map((m: { role: string; content: string }) => ({
-                role: m.role as "user" | "assistant",
-                content: m.content,
-              })),
+              ...formattedHistory,
             ],
             model: modelId,
             temperature: 0.5,
@@ -99,6 +102,7 @@ export async function POST(req: Request) {
                 }
                 controller.close();
               } catch (streamErr) {
+                console.error(`[API /api/chat] Stream iteration error on ${modelId}:`, streamErr);
                 controller.error(streamErr);
               }
             },
@@ -112,17 +116,25 @@ export async function POST(req: Request) {
             },
           });
         } catch (groqErr: any) {
-          console.error(`[API /api/chat] Groq ${modelId} error:`, groqErr?.message || groqErr);
+          console.error(`[API /api/chat] Groq ${modelId} error:`, JSON.stringify({
+            status: groqErr?.status,
+            message: groqErr?.message || groqErr,
+            error: groqErr?.error,
+          }));
         }
       }
     }
 
-    // 2. NO WORKING API - APOLOGIZE AND END SESSION (NO HARCODED REPLIES)
+    // 2. NO WORKING API - RETURN CLINICAL APOLOGY AND END SESSION
+    console.error("[API /api/chat] All AI providers failed. Returning fallback response.");
     return new Response(SERVER_ERROR_MESSAGE, {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (err: any) {
-    console.error("Chat API Route Error:", err?.message || err);
+    console.error("Chat API Route Fatal Error:", JSON.stringify({
+      message: err?.message || err,
+      stack: err?.stack,
+    }));
     return new Response(SERVER_ERROR_MESSAGE, {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });

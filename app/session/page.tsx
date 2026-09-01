@@ -223,34 +223,7 @@ function SessionContent() {
       console.warn("Microphone access declined or unavailable.");
     }
 
-    // On mobile, speech synthesis clips the start of the first utterance.
-    // Warm up the engine with a silent utterance, then speak the real greeting.
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) {
-        const warmup = new SpeechSynthesisUtterance(" ");
-        warmup.volume = 0;
-        warmup.rate = 10; // finish instantly
-        warmup.onend = () => {
-          // Small extra buffer for the engine to be truly ready
-          setTimeout(() => {
-            speak(initialGreeting, () => {
-              startListening();
-            });
-          }, 300);
-        };
-        warmup.onerror = () => {
-          // Fallback: just speak directly if warmup fails
-          speak(initialGreeting, () => {
-            startListening();
-          });
-        };
-        window.speechSynthesis.speak(warmup);
-        return;
-      }
-    }
-
-    // Desktop: speak immediately (no warmup needed)
+    // Speak opening greeting with high-fidelity server TTS and start listening when done
     speak(initialGreeting, () => {
       startListening();
     });
