@@ -57,7 +57,7 @@ export default function HeroSection({ onStartReset }: HeroSectionProps) {
                 href="/session?trigger=Substance+Craving"
                 className="w-full sm:w-auto py-4 sm:py-3.5 px-7 rounded-full font-bold text-[15px] sm:text-base bg-[#FF8811] hover:bg-amber-400 text-zinc-950 text-center flex items-center justify-center gap-2 shadow-[0_4px_25px_rgba(245,158,11,0.3)] hover:shadow-[0_0_35px_rgba(245,158,11,0.4)] transition-all active:scale-[0.98]"
               >
-                <span>Start 90s Reset</span>
+                <span>Talk to Dr Marcus</span>
                 <span className="text-base font-bold">→</span>
               </Link>
 
