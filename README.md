@@ -57,18 +57,18 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resil
 ## 🛠️ Architecture & Data Flow
 
 ```mermaid
-graph TD
-    User(["User Voice Input"]) -->|"Web Speech API"| Client["Next.js Client"]
-    Client -->|"POST /api/chat (History + Context)"| Engine{"Dual-Engine AI Pipeline"}
-    Engine -->|"Primary (Sub-600ms)"| GroqServer["Groq LPU Engine"]
-    Engine -.->|"Secondary Fallback"| GeminiServer["Google Gemini 3.6 Flash"]
-    GroqServer -->|"Streamed Clinical Response"| Client
-    GeminiServer -->|"Streamed Clinical Response"| Client
-    Client -->|"POST /api/tts (Sentence Chunks)"| TTSAPI["Amazon Polly / REST TTS Bridge"]
-    TTSAPI -->|"audio/mpeg MP3 Buffer"| Client
-    Client -->|"HTML5 Audio Playback + Lip-Sync"| Avatar["Dr. Marcus Avatar"]
-    Avatar -->|"onended + 400ms Handshake"| User
-    Client -->|"Log Outcome"| Firebase[("Firestore DB")]
+flowchart TD
+    User["User Voice Input"] -->|Web Speech API| Client["Next.js Client"]
+    Client -->|POST /api/chat History + Context| Engine{"Dual-Engine AI Pipeline"}
+    Engine -->|Primary Sub-600ms| GroqServer["Groq LPU Engine"]
+    Engine -.->|Secondary Fallback| GeminiServer["Google Gemini 3.6 Flash"]
+    GroqServer -->|Streamed Clinical Response| Client
+    GeminiServer -->|Streamed Clinical Response| Client
+    Client -->|POST /api/tts Sentence Chunks| TTSAPI["Amazon Polly / REST TTS Bridge"]
+    TTSAPI -->|audio/mpeg MP3 Buffer| Client
+    Client -->|HTML5 Audio Playback + Lip-Sync| Avatar["Dr. Marcus Avatar"]
+    Avatar -->|onended + 400ms Handshake| User
+    Client -->|Log Outcome| Firebase[("Firestore DB")]
 ```
 
 ---
