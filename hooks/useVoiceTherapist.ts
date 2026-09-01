@@ -410,11 +410,11 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
   }, [enqueueSentence, setSpeakingState, stopListening]);
 
-  // 7. Static Speak Function (Lock isSpeaking immediately on Line 1)
+  // 7. Static Speak Function (Synchronous Audio Instantiation to Preserve Mobile Autoplay Gestures)
   const speak = useCallback(async (text: string, onFinish?: () => void) => {
     if (typeof window === "undefined") return;
 
-    // LINE 1: Lock speaking state and stop mic immediately before network download
+    // LINE 1: Lock speaking state and stop mic immediately
     setSpeakingState(true);
     stopListening();
 
@@ -438,43 +438,51 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       return;
     }
 
+    // Synchronously instantiate Audio within the user-gesture call stack
+    const audio = new Audio();
+    activeAudioRef.current = audio;
+
+    audio.onplay = () => {
+      setSpeakingState(true);
+      stopRecognitionInternal();
+    };
+
+    audio.onended = () => {
+      if (audio.src.startsWith("blob:")) {
+        URL.revokeObjectURL(audio.src);
+      }
+      if (activeAudioRef.current === audio) {
+        activeAudioRef.current = null;
+      }
+      setSpeakingState(false);
+      if (onFinish) {
+        onFinish();
+      }
+    };
+
+    audio.onerror = (e) => {
+      console.warn("[Audio] Playback error on speech audio element:", e);
+      if (audio.src.startsWith("blob:")) {
+        URL.revokeObjectURL(audio.src);
+      }
+      if (activeAudioRef.current === audio) {
+        activeAudioRef.current = null;
+      }
+      setSpeakingState(false);
+      if (onFinish) {
+        onFinish();
+      }
+    };
+
     const audioUrl = await fetchServerAudioUrl(clean);
     if (audioUrl) {
       try {
-        const audio = new Audio(audioUrl);
-        activeAudioRef.current = audio;
-
-        audio.onplay = () => {
-          setSpeakingState(true);
-          stopRecognitionInternal();
-        };
-
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          if (activeAudioRef.current === audio) {
-            activeAudioRef.current = null;
-          }
-          setSpeakingState(false);
-          if (onFinish) {
-            onFinish();
-          }
-        };
-
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          if (activeAudioRef.current === audio) {
-            activeAudioRef.current = null;
-          }
-          setSpeakingState(false);
-          if (onFinish) {
-            onFinish();
-          }
-        };
-
+        audio.src = audioUrl;
         await audio.play();
         return;
-      } catch (err) {
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
+      } catch (err: any) {
+        console.warn("[Audio] Autoplay / Audio.play() rejected:", err?.message || err);
+        if (audioUrl.startsWith("blob:")) URL.revokeObjectURL(audioUrl);
       }
     }
 
