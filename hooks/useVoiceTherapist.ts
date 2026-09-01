@@ -10,7 +10,6 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const isSpeakingRef = useRef<boolean>(false);
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const restartTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastTranscriptRef = useRef<string>("");
   const accumulatedFinalsRef = useRef<string>("");
   const isFinalizedRef = useRef<boolean>(false);
@@ -100,16 +99,12 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
   };
 
-  // 3. Stop active recognition instance safely and cancel all pending restart timers
+  // 3. Stop active recognition instance safely
   const stopRecognitionInternal = useCallback(() => {
     wantListeningRef.current = false;
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
-    }
-    if (restartTimerRef.current) {
-      clearTimeout(restartTimerRef.current);
-      restartTimerRef.current = null;
     }
     if (recognitionRef.current) {
       try {
@@ -128,8 +123,9 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   const startListening = useCallback(async () => {
     if (typeof window === "undefined") return;
 
-    // STRICT HALF-DUPLEX LOCK: Abort immediately if audio is playing
+    // STRICT HALF-DUPLEX GUARD: If therapist is speaking, do NOT touch active audio or start mic
     if (isSpeakingRef.current) {
+      console.log("[Mic] Blocked startListening: Therapist is speaking");
       return;
     }
 
@@ -145,7 +141,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     audioQueueRef.current = [];
     isPlayingQueueRef.current = false;
 
-    // Clean up previous instance and timers
+    // Clean up previous instance
     stopRecognitionInternal();
 
     const permitted = hasMicPermission ?? (await requestMicAccess());
@@ -153,6 +149,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
 
     // Re-verify speaking lock after async mic check
     if (isSpeakingRef.current) {
+      console.log("[Mic] Blocked startListening: Therapist is speaking");
       return;
     }
 
@@ -233,19 +230,11 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
 
     recognition.onend = () => {
       setIsListening(false);
-      // STRICT HALF-DUPLEX: ONLY restart if actively requested, NOT speaking, and not finalized
+      // Clean, timer-free restart guard: ONLY restart if listening is wanted, NOT speaking, and not finalized
       if (wantListeningRef.current && !isSpeakingRef.current && !isFinalizedRef.current) {
-        if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-        restartTimerRef.current = setTimeout(() => {
-          if (wantListeningRef.current && !isSpeakingRef.current && !isFinalizedRef.current && recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch (restartErr) {
-              setIsListening(false);
-              wantListeningRef.current = false;
-            }
-          }
-        }, 200);
+        try {
+          recognitionRef.current?.start();
+        } catch (e) {}
       }
     };
 
@@ -291,6 +280,10 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       }
     }
 
+    // Lock speech state immediately during network fetch
+    setSpeakingState(true);
+    stopRecognitionInternal();
+
     // Fetch server audio with automatic retry
     const audioUrl = await fetchServerAudioUrl(sentenceToSpeak);
 
@@ -298,10 +291,6 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       try {
         const audio = new Audio(audioUrl);
         activeAudioRef.current = audio;
-
-        // LOCK SPEECH HANDSHAKE IMMEDIATELY BEFORE PLAY
-        setSpeakingState(true);
-        stopRecognitionInternal();
 
         audio.onplay = () => {
           setSpeakingState(true);
@@ -360,6 +349,10 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
   ) => {
     if (typeof window === "undefined") return;
 
+    // Lock speaking state immediately on stream start
+    setSpeakingState(true);
+    stopListening();
+
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
       activeAudioRef.current.src = "";
@@ -368,7 +361,6 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    stopListening();
 
     audioQueueRef.current = [];
     isPlayingQueueRef.current = false;
@@ -382,6 +374,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     onQueueFinishedRef.current = () => {
       const shouldEnd = fullAccumulatedText.includes("[END_SESSION]");
       const cleanFull = fullAccumulatedText.replace(/\[END_SESSION\]/g, "").replace(/[*_#`]/g, "").trim();
+      setSpeakingState(false);
       onFinish(cleanFull, shouldEnd);
     };
 
@@ -428,12 +421,14 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
     }
   }, [enqueueSentence, setSpeakingState, stopListening]);
 
-  // 7. Static Speak Function (Pure Server-Side Male TTS Stream with Controlled 400ms Handshake)
+  // 7. Static Speak Function (Lock isSpeaking immediately on Line 1)
   const speak = useCallback(async (text: string, onFinish?: () => void) => {
     if (typeof window === "undefined") return;
 
-    // Immediately stop any active recognition or playback
+    // LINE 1: Lock speaking state and stop mic immediately before network download
+    setSpeakingState(true);
     stopListening();
+
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
       activeAudioRef.current.src = "";
@@ -449,6 +444,7 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
 
     const clean = text.replace(/\[END_SESSION\]/g, "").replace(/[*_#`]/g, "").trim();
     if (!clean) {
+      setSpeakingState(false);
       if (onFinish) onFinish();
       return;
     }
@@ -458,10 +454,6 @@ export function useVoiceTherapist(onUserSpoke?: (text: string) => void) {
       try {
         const audio = new Audio(audioUrl);
         activeAudioRef.current = audio;
-
-        // LOCK SPEECH HANDSHAKE IMMEDIATELY BEFORE PLAY
-        setSpeakingState(true);
-        stopRecognitionInternal();
 
         audio.onplay = () => {
           setSpeakingState(true);

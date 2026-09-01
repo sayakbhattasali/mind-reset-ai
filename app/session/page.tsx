@@ -210,20 +210,13 @@ function SessionContent() {
     }
   };
 
-  const beginTherapy = async () => {
+  const beginTherapy = () => {
     changePhase("active");
     const initialGreeting = `I'm right here with you. Let's calm this ${selectedTrigger} together. Take a slow, deep breath... and tell me how you feel.`;
 
     setMessages([{ role: "assistant", content: initialGreeting }]);
 
-    // 1. First ensure mic permission is granted and cleanly resting (not actively recording)
-    try {
-      await requestMicAccess();
-    } catch (e) {
-      console.warn("Microphone access declined or unavailable.");
-    }
-
-    // 2. Play greeting strictly to completion BEFORE engaging listener
+    // Speak greeting. The mic will ONLY activate inside this callback once audio finishes.
     speak(initialGreeting, () => {
       startListening();
     });
