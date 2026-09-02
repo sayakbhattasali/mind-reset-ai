@@ -33,7 +33,7 @@ Guided by **Dr. Marcus**—an empathetic AI somatic clinician powered by a resil
 
 ### 🎙️ 1. Real-Time Conversational Voice Therapist
 - **Strict Half-Duplex Turn-Taking**: Zero microphone feedback loops; the microphone hardware activates strictly after Dr. Marcus finishes speaking.
-- **Deep Clinical Male Voice**: Guaranteed masculine clinician voice across laptops, iPhones, and Android devices via high-speed zero-key serverless audio streaming.
+- **Deep Clinical Voice**: Guaranteed clinician voice across laptops, iPhones, and Android devices via high-speed zero-key serverless audio streaming.
 - **Microphone Echo Isolation**: 400ms controlled handshake prevents Dr. Marcus's voice from echoing into speech recognition.
 
 ### 👤 2. Procedural Human Avatar (Dr. Marcus)
